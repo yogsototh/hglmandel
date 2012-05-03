@@ -1,6 +1,6 @@
  ## Only the edges
 
-<div style="display:hidden">
+<div style="display:none">
 
 > import Graphics.Rendering.OpenGL
 > import Graphics.UI.GLUT
@@ -88,7 +88,7 @@ We make a simple dichotomic search:
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
 
-<div style="display:hidden">
+<div style="display:none">
 
 > colorFromValue n =
 >   let 
