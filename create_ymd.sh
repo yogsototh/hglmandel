@@ -61,7 +61,7 @@ enddiv
 END
 
 
-for fic in *.lhs(.N) **/*.lhs(.N); do
+for fic in **/*.lhs(.N); do
     contains_haskell=$(( $( egrep '^>' $fic | wc -l) > 0 ))
     ((contains_haskell)) && \
         print -- "\n<hr/><a href=\"code/$fic\" class=\"cut\">${fic:h}/<strong>${fic:t}</strong></a>\n"

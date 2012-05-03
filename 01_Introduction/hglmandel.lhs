@@ -73,12 +73,18 @@ No easy parallel drawing here.
 Here is the function which will render something on the screen:
 
 > drawMandelbrot =
+>   -- We will print Points (not triangles for example) 
 >   renderPrimitive Points $ do
->     mapM_ (\(x,y,c) -> do
->                       color c
->                       vertex $ Vertex3 x y 0) allPoints
+>     mapM_ drawColoredPoint allPoints
+>   where
+>       drawColoredPoint (x,y,c) = do
+>           color c -- set the current color to c
+>           -- then draw the point at position (x,y,0)
+>           -- remember we're in 3D
+>           vertex $ Vertex3 x y 0 
 
-This is simple, without the `mapM_` function, it would be equivalent to:
+The `mapM_` function is mainly the same as map but inside a monadic context.
+More precisely, this can be transformed as a list of actions where the order is important:
 
 ~~~
 drawMandelbrot = 
@@ -90,10 +96,9 @@ drawMandelbrot =
     vertex $ Vertex3 xN yN 0
 ~~~
 
-This is all the orders given in the right order.
-Mainly it is, set the color, draw the point, set another color, draw another point, etc...
-
-We need some kind of global variable, in fact, this is the proof of a bad design. But this is our first start:
+We also need some kind of global variables. 
+In fact, global variable are a proof of some bad design. 
+But remember it is our first try:
 
 > width = 320 :: GLfloat
 > height = 320 :: GLfloat
@@ -125,7 +130,22 @@ Given two coordinates in pixels, it returns some integer value:
 >   in
 >       f (complex r i) 0 64
 
-It uses the main mandelbrot function for each complex z.
+It uses the main mandelbrot function for each complex c.
+The mandelbrot set is the set of complex number c such that the following sequence does not escape to infinity.
+
+Let us define: 
+
+<div>
+$$ f_c : z \rightarrow z^2 + c $$
+</div>
+
+The serie is: 
+
+<div>
+$$ 0 \rightarrow f_c(0) \rightarrow f_c(f_c(0)) \rightarrow \cdots \rightarrow f^n_c(0) \rightarrow \cdots $$
+</div>
+
+Of course, instead of trying to test the real limit, we just make a test after a finite number of occurences.
 
 > f :: Complex -> Complex -> Int -> Int
 > f c z 0 = 0
@@ -133,10 +153,22 @@ It uses the main mandelbrot function for each complex z.
 >           then n
 >           else f c ((z*z)+c) (n-1)
 
-Well, use this file, and see what occurs!
+Well, if you download this lhs file, compile it and run it this is the result:
 
 blogimage("hglmandel_v01.png","The mandelbrot set version 1")
 
-But see what occurs, if we make the window bigger:
+A first very interresting property of this program is that the computation for all the points is done only once.
+The proof is that it might be a bit long before a first image appears, but if you resize the window, it updates instantaneously.
+This property is a direct consequence of purity.
+If you look closely, you see that `allPoints` is a pure list.
+Therefore, calling `allPoints` will always render the same result.
+While Haskell doesn't grabage collect `allPoints` the result is reused for free.
+We didn't specified this value should be saved for later use. 
+It is saved for us.
+
+See what occurs if we make the window bigger:
 
 blogimage("hglmandel_v01_too_wide.png","The mandelbrot too wide, black lines and columns")
+
+Wep, we see some black lines.
+Why? Simply because we drawed points and not surfaces.
