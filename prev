@@ -1,0 +1,16 @@
+#!/usr/bin/env zsh
+
+webroot="$HOME/Sites/webroot"
+
+print -- "Create article"
+./create_ymd.sh > $webroot/latest.ymd
+
+print -- "Copy sources"
+for langue in en fr; do
+    dst="$webroot/output/Scratch/$langue/blog/Haskell-OpenGL-Mandelbrot/code"
+    [[ ! -d $dst ]] && mkdir -p $dst
+    cp -r *.lhs ??_*(N/)  $dst
+done
+
+cd $webroot
+./tasks/recompile
