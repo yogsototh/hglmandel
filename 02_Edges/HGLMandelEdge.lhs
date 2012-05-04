@@ -76,10 +76,24 @@ The mandelbrot set is symetric on the abscisse axis.
 > positivePoints = do
 >               x <- [-width..width]
 >               let y = findMaxOrdFor (mandel x) 0 height 10 -- log height
->               return (x/width,y/height,colorFromValue $ mandel x y)
+>               if y < 1 -- We don't draw point in the absciss
+>                  then []
+>                  else return (x/width,y/height,colorFromValue $ mandel x y)
 
 
-We make a simple dichotomic search:
+This function is interresting. 
+For those not used to the list monad here is a natural language version of this function:
+
+~~~
+positivePoints =
+    for all x in the range [-width..width]
+    let y be smallest number s.t. mandel x y > 0
+    if y is on 0 then don't return a point
+    else return the value corresonding to (x,y,color for (x+iy))
+~~~
+
+In fact using the list monad you write like if you consider only one element at a time and the computation is done non deterministically.
+To find the smallest number such that mandel x y > 0 we create a simple dichotomic search:
 
 > findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
@@ -87,6 +101,11 @@ We make a simple dichotomic search:
 >        then findMaxOrdFor func minval medpoint (n-1)
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
+
+No rocket science here.
+See the result now:
+
+blogimage("HGLMandelEdge.png","The edge of the mandelbrot set")
 
 <div style="display:none">
 
