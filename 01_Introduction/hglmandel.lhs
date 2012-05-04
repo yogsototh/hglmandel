@@ -1,19 +1,26 @@
  ## First version
 
-Let us start with the general architecture.
+I splitted even the first version in two parts.
+The first being mostly some boilerplate.
+Generally in Haskell you need to declare a lot of import lines.
+This is something I find annoying.
+In particular, it should be possible to create a special file, Import.hs
+which make all the necessary import for you, as you generally need them all.
+I understand why this is cleaner to force the programmer not to do so, but, each time I do a copy/paste, I feel something is wrong.
+The second part, contain more interresting stuff.
+Even in this part, there are some necessary boilerplate. 
+But it is due to the  OpenGL library this time.
 
-First, the import system of Haskell is full of boilerplate.
-A bit like Java. Let's play the song of our people:
+ ### Let's play the song of our people
 
 > import Graphics.Rendering.OpenGL
 > import Graphics.UI.GLUT
 > import Data.IORef
 
-Also, for efficiency reason, I won't use the default Haskell `Complex` data type. We declare our type:
+For efficiency reason, I won't use the default Haskell `Complex` data type.
 
 > newtype Complex = C (Float,Float) deriving (Show,Eq)
 
-and make it an element of the typeclass `Num`:
 
 > instance Num Complex where
 >     fromInteger n = C (fromIntegral n,0.0)
@@ -35,6 +42,9 @@ We declare some useful functions for manipulating complex numbers:
 > 
 > magnitude :: Complex -> Float
 > magnitude = real.abs
+
+
+ ### Let us start
 
 Well, up until here we didn't made something useful.
 Just a lot of boilerplate and default value.
@@ -130,20 +140,16 @@ Given two coordinates in pixels, it returns some integer value:
 >   in
 >       f (complex r i) 0 64
 
-It uses the main mandelbrot function for each complex c.
+It uses the main mandelbrot function for each complex $c$.
 The mandelbrot set is the set of complex number c such that the following sequence does not escape to infinity.
 
-Let us define: 
+Let us define $f_c: \mathbb{C} \to \mathbb{C}$
 
-<div>
-$$ f_c : z \rightarrow z^2 + c $$
-</div>
+$$ f_c(z) = z^2 + c $$
 
 The serie is: 
 
-<div>
 $$ 0 \rightarrow f_c(0) \rightarrow f_c(f_c(0)) \rightarrow \cdots \rightarrow f^n_c(0) \rightarrow \cdots $$
-</div>
 
 Of course, instead of trying to test the real limit, we just make a test after a finite number of occurences.
 
@@ -171,4 +177,6 @@ See what occurs if we make the window bigger:
 blogimage("hglmandel_v01_too_wide.png","The mandelbrot too wide, black lines and columns")
 
 Wep, we see some black lines.
-Why? Simply because we drawed points and not surfaces.
+Why? Simply because we drawed less point than there is on the surface.
+We can repair this by drawing little squares instead of just points.
+But, instead we will do something a bit different and unusual.
