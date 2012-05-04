@@ -23,7 +23,7 @@ But it will be enough for us to create something nice.
 > newtype ExtComplex = C (Float,Float,Float) deriving (Show,Eq)
 > instance Num ExtComplex where
 >     fromInteger n = C (fromIntegral n,0.0,0.0)
->     C (x,y,u) * C (z,t,v) = C (z*x - y*t, y*z + x*t, 0.0)
+>     C (x,y,u) * C (z,t,v) = C (z*x - y*t + u*v, y*z + x*t - u*v, x*v + y*t + u*z )
 >     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
 >     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
 >     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
@@ -49,20 +49,29 @@ But it will be enough for us to create something nice.
 >   initialDisplayMode $= [DoubleBuffered]
 >   -- We create a window with some title
 >   createWindow "Mandelbrot Set with Haskell and OpenGL"
+>   angle <- newIORef (0.0 :: GLfloat)
+>   idleCallback $= Just (idle angle)
 >   -- Each time we will need to update the display
 >   -- we will call the function 'display'
->   displayCallback $= display
+>   displayCallback $= display angle
 >   -- We enter the main loop
 >   mainLoop
-> display = do
->   clear [ColorBuffer] -- make the window black
+> idle angle = do
+>   a <- get angle
+>   angle $=! (a + 2)
+>   postRedisplay Nothing
+
+> display angle = do
+>   clear [ColorBuffer,DepthBuffer] -- make the window black
 >   loadIdentity -- reset any transformation
+>   a <- get angle
+>   rotate a $ Vector3 1.0 0.0 (0.0::GLfloat)
 >   preservingMatrix drawMandelbrot
 >   swapBuffers -- refresh screen
 > 
-> width  = 32 :: GLfloat
-> height = 32 :: GLfloat
-> deep   = 32 :: GLfloat
+> width  = 50 :: GLfloat
+> height = 50 :: GLfloat
+> deep   = 50 :: GLfloat
 
 
 </div>
@@ -73,7 +82,7 @@ We replace the `Points` by `LineLoop`
 
 > drawMandelbrot =
 >   -- We will print Points (not triangles for example) 
->   renderPrimitive TriangleStrip $ do
+>   renderPrimitive Points $ do
 >     mapM_ drawColoredPoint allPoints
 >   where
 >       drawColoredPoint (x,y,z,c) = do
@@ -88,47 +97,13 @@ we will choose only point on the surface.
 
 
 > allPoints :: [ColoredPoint]
-> allPoints = order $ positivePoints ++ map (\(x,y,z,c) -> (x,-y,z,c)) (reverse positivePoints)
-
-> closestPoint :: ColoredPoint -> [ColoredPoint] -> ColoredPoint
-> closestPoint x xs = clPoint x xs (width,height,deep,colorFromValue 0)
->   where
->       clPoint :: ColoredPoint -> [ColoredPoint] -> ColoredPoint -> ColoredPoint
->       clPoint _ [] res = res
->       clPoint p (p':xs) res = 
->               if dist p p'  < dist p res
->                  then clPoint p xs p'
->                  else clPoint p xs res
-
-> dist (x,y,z,_) (x',y',z',_) = x*x' + y*y' + z*z'
-
-> order :: [ColoredPoint] -> [ColoredPoint]
-> order [] = []
-> order (x:[]) = [x]
-> order (x:xs) =
->          let 
->               closest = closestPoint x xs
->               newlist = filter (/=closest) xs
->          in x:order (closest:newlist)
-
-
-We only need to compute the positive point.
-The mandelbrot set is symetric on the abscisse axis.
-
-> positivePoints :: [ColoredPoint]
-> positivePoints = do
->               x <- [-width..width]
->               y <- [0..height]
->               let z = findMaxOrdFor (mandel x y) 0 deep 6 -- log deep
->               if z < 1
->               then []
->               else return (x/width,y/height,z/deep,colorFromValue $ mandel x y z)
-
- >               else [(x/width,y/height,z/deep,colorFromValue $ mandel x y z),
- >                    (x/width,y+1/height,z/deep,colorFromValue $ mandel x y z),
- >                    (x+1/width,y+1/height,z/deep,colorFromValue $ mandel x y z),
- >                    (x+1/width,y/height,z/deep,colorFromValue $ mandel x y z) ]
-
+> allPoints = do
+>   x <- [-width..width]
+>   y <- [-height..height]
+>   z <- [-deep..deep]
+>   if mandel x y z /= 0
+>   then []
+>   else return (x/width,y/height,z/deep,colorFromValue (truncate z))
 
 This function is interresting. 
 For those not used to the list monad here is a natural language version of this function:
@@ -166,7 +141,7 @@ The new mandel function
 > colorFromValue n =
 >   let 
 >       t :: Int -> GLfloat
->       t i = 0.5 + 0.5*cos( fromIntegral i / 10 )
+>       t i = 0.7 + 0.3*cos( fromIntegral i / 10 )
 >   in
 >     Color3 (t n) (t (n+5)) (t (n+10))
 
