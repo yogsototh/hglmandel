@@ -20,26 +20,26 @@ But it will be enough for us to create something nice.
 
 </div>
 
-> newtype ExtComplex = C (Float,Float,Float) deriving (Show,Eq)
+> data ExtComplex = C (GLfloat,GLfloat,GLfloat) deriving (Show,Eq)
 > instance Num ExtComplex where
 >     fromInteger n = C (fromIntegral n,0.0,0.0)
 >     C (x,y,u) * C (z,t,v) = C (z*x - y*t + u*v, y*z + x*t - u*v, x*v + y*t + u*z )
 >     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
 >     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
 >     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
-> extcomplex :: Float -> Float -> Float -> ExtComplex
+> extcomplex :: GLfloat -> GLfloat -> GLfloat -> ExtComplex
 > extcomplex x y z = C (x,y,z)
 > 
-> real :: ExtComplex -> Float
+> real :: ExtComplex -> GLfloat
 > real (C (x,y,z))    = x
 > 
-> im :: ExtComplex -> Float
+> im :: ExtComplex -> GLfloat
 > im   (C (x,y,z))    = y
 >
-> strange :: ExtComplex -> Float
+> strange :: ExtComplex -> GLfloat
 > strange (C (x,y,z)) = z
 > 
-> magnitude :: ExtComplex -> Float
+> magnitude :: ExtComplex -> GLfloat
 > magnitude = real.abs
 > main :: IO ()
 > main = do
@@ -49,29 +49,72 @@ But it will be enough for us to create something nice.
 >   initialDisplayMode $= [DoubleBuffered]
 >   -- We create a window with some title
 >   createWindow "Mandelbrot Set with Haskell and OpenGL"
+>   -- Some state variables
 >   angle <- newIORef (0.0 :: GLfloat)
->   idleCallback $= Just (idle angle)
+>   delta <- newIORef (0.05 :: GLfloat)
+>   zoom <- newIORef (1.00 :: GLfloat)
+>   position <- newIORef (0.0::GLfloat,0.0)
+>   -- Action to call when waiting
+>   idleCallback $= Just (idle angle delta)
+>   keyboardMouseCallback $= Just (keyboardMouse delta zoom position)
 >   -- Each time we will need to update the display
 >   -- we will call the function 'display'
->   displayCallback $= display angle
+>   displayCallback $= display angle zoom position
 >   -- We enter the main loop
 >   mainLoop
-> idle angle = do
+> idle angle delta = do
 >   a <- get angle
->   angle $=! (a + 2)
+>   d <- get delta
+>   angle $=! (a + d)
 >   postRedisplay Nothing
 
-> display angle = do
+> keyboardMouse delta zoom pos key state modifiers position =
+>   keyboardAct delta zoom pos key state
+>   where 
+>     keyboardAct d _ _ (Char ' ') Down = do
+>           d' <- get d
+>           d $= 0
+>     keyboardAct d _ _ (Char 'j') Down = do
+>           d' <- get d
+>           d $= (d'+0.01)
+>     keyboardAct d _ _ (Char 'k') Down = do
+>           d' <- get d
+>           d $= (d'-0.01)
+>     keyboardAct _ s _ (Char 'o') Down = do
+>           s' <- get s
+>           s $= (s'*1.1)
+>     keyboardAct _ s _ (Char 'i') Down = do
+>           s' <- get s
+>           s $= (s'*0.9)
+>     keyboardAct _ _ p (Char 'f') Down = do
+>           (x,y) <- get p
+>           p $= (x+0.1,y)
+>     keyboardAct _ _ p (Char 's') Down = do
+>           (x,y) <- get p
+>           p $= (x-0.1,y)
+>     keyboardAct _ _ p (Char 'e') Down = do
+>           (x,y) <- get p
+>           p $= (x,y-0.1)
+>     keyboardAct _ _ p (Char 'd') Down = do
+>           (x,y) <- get p
+>           p $= (x,y+0.1)
+>     keyboardAct _ _ _ _ _ = return ()
+
+> display angle zoom position = do
 >   clear [ColorBuffer,DepthBuffer] -- make the window black
 >   loadIdentity -- reset any transformation
+>   (x,y) <- get position
+>   translate $ Vector3 x y 0 
+>   z <- get zoom
+>   scale z z z
 >   a <- get angle
 >   rotate a $ Vector3 1.0 0.0 (0.0::GLfloat)
 >   preservingMatrix drawMandelbrot
 >   swapBuffers -- refresh screen
 > 
-> width  = 50 :: GLfloat
-> height = 50 :: GLfloat
-> deep   = 50 :: GLfloat
+> width  = 500 :: GLfloat
+> height = 500 :: GLfloat
+> deep   = 500 :: GLfloat
 
 
 </div>
@@ -82,7 +125,7 @@ We replace the `Points` by `LineLoop`
 
 > drawMandelbrot =
 >   -- We will print Points (not triangles for example) 
->   renderPrimitive Points $ do
+>   renderPrimitive LineLoop $ do
 >     mapM_ drawColoredPoint allPoints
 >   where
 >       drawColoredPoint (x,y,z,c) = do
@@ -100,10 +143,10 @@ we will choose only point on the surface.
 > allPoints = do
 >   x <- [-width..width]
 >   y <- [-height..height]
->   z <- [-deep..deep]
+>   let z = findMaxOrdFor (mandel x y) 0 deep 7
 >   if mandel x y z /= 0
 >   then []
->   else return (x/width,y/height,z/deep,colorFromValue (truncate z))
+>   else return (x/width,y/height,z/deep,colorFromValue $ mandel x y (z+1))
 
 This function is interresting. 
 For those not used to the list monad here is a natural language version of this function:
