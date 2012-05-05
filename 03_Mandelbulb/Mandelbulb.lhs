@@ -23,7 +23,7 @@ But it will be enough for us to create something nice.
 > data ExtComplex = C (GLfloat,GLfloat,GLfloat) deriving (Show,Eq)
 > instance Num ExtComplex where
 >     fromInteger n = C (fromIntegral n,0.0,0.0)
->     C (x,y,u) * C (z,t,v) = C (z*x - y*t + u*v, y*z + x*t - u*v, x*v - y*z + u*t)
+>     C (x,y,u) * C (z,t,v) = C (z*x - y*t, y*z + x*t, y*v - t*u)
 >     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
 >     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
 >     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
@@ -46,27 +46,29 @@ But it will be enough for us to create something nice.
 >   -- GLUT need to be initialized
 >   (progname,_) <- getArgsAndInitialize
 >   -- We will use the double buffered mode (GL constraint)
->   initialDisplayMode $= [DoubleBuffered,RGBMode,WithDepthBuffer]
+>   initialDisplayMode $= [WithDepthBuffer,DoubleBuffered,RGBMode]
 >   -- We create a window with some title
 >   createWindow "Mandelbrot Set with Haskell and OpenGL"
+>   depthFunc $= Just Less
+>   matrixMode $= Projection
+>   windowSize $= Size 800 800
 >   -- Some state variables
 >   angle <- newIORef (0.0 :: GLfloat)
 >   delta <- newIORef (0.05 :: GLfloat)
 >   zoom <- newIORef (1.00 :: GLfloat)
->   position <- newIORef (0.0::GLfloat,0.0)
+>   campos <- newIORef (0.0::GLfloat,0.0)
 >   -- Action to call when waiting
 >   idleCallback $= Just (idle angle delta)
->   keyboardMouseCallback $= Just (keyboardMouse delta zoom position)
+>   keyboardMouseCallback $= Just (keyboardMouse delta zoom campos)
 >   -- Each time we will need to update the display
 >   -- we will call the function 'display'
->   displayCallback $= display angle zoom position
->   -- lighting $= Enabled
->   -- ambient (Light 0) $= Color4 0.3 0.3 0.3 1.0
->   -- diffuse (Light 0) $= Color4 0.9 0.9 0.8 1.0
->   -- light (Light 0) $= Enabled
->   -- ambient (Light 1) $= Color4 0.5 0.3 0.3 1.0
->   -- diffuse (Light 1) $= Color4 0.9 0.9 0.8 1.0
->   -- light (Light 1) $= Enabled
+>   displayCallback $= display angle zoom campos
+>   lighting $= Enabled
+>   ambient (Light 0) $= Color4 1 1 1 1
+>   diffuse (Light 0) $= Color4 1 1 1 1
+>   specular (Light 0) $= Color4 1 1 1 1
+>   position (Light 0) $= Vertex4 0 1.0 0.0 1
+>   light (Light 0) $= Enabled
 >   -- We enter the main loop
 >   mainLoop
 > idle angle delta = do
@@ -74,6 +76,19 @@ But it will be enough for us to create something nice.
 >   d <- get delta
 >   angle $=! (a + d)
 >   postRedisplay Nothing
+
+
+> crMat (rd,gd,bd) (rs,gs,bs) exp = do
+>   materialDiffuse   Front $= Color4 rd gd bd  1.0
+>   materialAmbient   Front $= Color4 rd gd bd  1.0
+>   materialSpecular  Front $= Color4 rs gs bs  1.0
+>   materialShininess Front $= exp
+>   
+>   materialDiffuse   Back $= Color4 rd gd bd  1.0
+>   materialSpecular  Back $= Color4 rs gs bs  1.0
+>   materialShininess Back $= exp
+
+> mainColor = crMat (0.5,0.5,0.3) (0.2,0.0,0.2) 50.0
 
 > keyboardMouse delta zoom pos key state modifiers position =
 >   keyboardAct delta zoom pos key state
@@ -119,9 +134,10 @@ But it will be enough for us to create something nice.
 >   preservingMatrix drawMandelbrot
 >   swapBuffers -- refresh screen
 > 
-> width  = 100 :: GLfloat
-> height = 100 :: GLfloat
-> deep   = 100 :: GLfloat
+> nbDetails = 100 :: GLfloat
+> width  = nbDetails
+> height = nbDetails
+> deep   = nbDetails
 
 
 </div>
@@ -130,9 +146,11 @@ This time, instead of drawing all points, I'll simply want to draw the edges of 
 We change slightly the drawMandelbrot function.
 We replace the `Points` by `LineLoop`
 
-> drawMandelbrot =
+
+> drawMandelbrot = do
 >   -- We will print Points (not triangles for example) 
->   renderPrimitive Quads $ do
+>   mainColor
+>   renderPrimitive Triangles $ do
 >     mapM_ drawColoredPoint allPoints
 >   where
 >       drawColoredPoint (x,y,z,c) = do
@@ -148,7 +166,6 @@ we will choose only point on the surface.
 
 > allPoints :: [ColoredPoint]
 > allPoints = depthPoints ++ map (\(x,y,z,c) -> (x,y,-z,c)) depthPoints
->             ++ heightPoints ++ map (\(x,y,z,c) -> (x,y,-z,c)) heightPoints
 > 
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
@@ -159,30 +176,13 @@ we will choose only point on the surface.
 >       z' = findMaxOrdFor (mandel (x+1) y) 0 deep 7
 >       z'' = findMaxOrdFor (mandel (x+1) (y+1)) 0 deep 7
 >       z''' = findMaxOrdFor (mandel x (y+1)) 0 deep 7
+>       p1 = (    x/width,    y/height,  z/deep,colorFromValue $ mandel    x    y   (z+1))
+>       p2 = ((x+1)/width,    y/height, z'/deep,colorFromValue $ mandel (x+1)   y   (z'+1))
+>       p3 = ((x+1)/width,(y+1)/height,z''/deep,colorFromValue $ mandel (x+1) (y+1) (z''+1))
+>       p4 = (    x/width,(y+1)/height,z'''/deep,colorFromValue $ mandel    x  (y+1) (z'''+1))
 >   if (mandel x y (z-1) /= 0)
 >   then []
->   else [(x/width,y/height,z/deep,colorFromValue $ mandel x y (z+1))
->        ,((x+1)/width,y/height,z'/deep,colorFromValue $ mandel (x+1) y (z'+1))
->        ,((x+1)/width,(y+1)/height,z''/deep,colorFromValue $ mandel (x+1) (y+1) (z''+1))
->        ,(x/width,(y+1)/height,z'''/deep,colorFromValue $ mandel x (y+1) (z'''+1))]
-
-> heightPoints :: [ColoredPoint]
-> heightPoints = do
->   x <- [-width..width]
->   z <- [-deep..deep]
->   let 
->       y = findMaxOrdFor (nm x z) 0 height 7
->       y' = findMaxOrdFor (nm (x+1) z) 0 height 7
->       y'' = findMaxOrdFor (nm (x+1) (z+1)) 0 height 7
->       y''' = findMaxOrdFor (nm x (z+1)) 0 height 7
->   if (mandel x (y-1) z /= 0)
->   then []
->   else [(x/width,y/height,z/deep,colorFromValue $ mandel x y z)
->        ,((x+1)/width,y'/height,z/deep,colorFromValue $ mandel (x+1) y' z)
->        ,((x+1)/width,y''/height,z/deep,colorFromValue $ mandel (x+1) y'' (z+1))
->        ,(x/width,y'''/height,z/deep,colorFromValue $ mandel x y''' (z+1))]
->   where
->       nm x z = \y -> mandel x y z
+>   else [p1,p2,p3,p1,p3,p4]
 
 This function is interresting. 
 For those not used to the list monad here is a natural language version of this function:
