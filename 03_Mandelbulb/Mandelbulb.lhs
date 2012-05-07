@@ -78,9 +78,9 @@ And also we will listen the keyboard.
 >   -- matrixMode $= Projection
 >   windowSize $= Size 500 500
 >   -- Some state variables (I know it feels BAD)
->   angle   <- newIORef ((1.0 :: GLfloat,0.0))
->   zoom    <- newIORef (1.0 :: GLfloat)
->   campos  <- newIORef (0.0 :: GLfloat,0.0)
+>   angle   <- newIORef ((35.0 :: GLfloat,0.0))
+>   zoom    <- newIORef (2.0 :: GLfloat)
+>   campos  <- newIORef (0.7 :: GLfloat,0.0)
 >   -- Action to call when waiting
 >   idleCallback $= Just idle
 >   -- We will use the keyboard
@@ -141,7 +141,8 @@ Note, this time, display take some parameters.
 Mainly, this function if full of boilerplate:
 
 > display angle zoom position = do
->    -- make the window black
+>    -- set the background color
+>   clearColor $= Color4 0 0.1686 0.2117 1
 >   clear [ColorBuffer,DepthBuffer]
 >   -- Transformation to change the view
 >   loadIdentity -- reset any transformation
@@ -164,7 +165,7 @@ Mainly there are two parts: apply some transformations, draw the object.
 
 First, we will set the resolution to 180 pixels.
 
-> nbDetails = 180 :: GLfloat
+> nbDetails = 130 :: GLfloat
 > width  = nbDetails
 > height = nbDetails
 > deep   = nbDetails
@@ -182,48 +183,85 @@ The idea is that we should provide points three by three.
 >           color c
 >           vertex $ Vertex3 x y z
 
-Now instead of providing only one point at a time, we will provide six points.
+Now instead of providing only one point at a time, we will provide six ordered points. 
+These points will be used to draw two triangles.
+
 
 blogimage("triangles.png","Explain triangles")
 
-> allPoints :: [ColoredPoint]
-> allPoints = depthPoints ++ map inverse  depthPoints
->   where inverse (x,y,z,c) = (x,y,-z+1/deep,c)
-> 
+Note in 3D the depth of the point is generally different.
+The next function is a bit long. 
+An approximative English version is:
+
+~~~
+forall x from -width to width
+  forall y from -height to height
+    forall the neighbors of (x,y)
+      let z be the smalled depth such that (mandel x y z)>0
+      let c be the color given by mandel x y z 
+      add the point corresponding to (x,y,z,c)
+~~~
+
+Also, I added a test to hide points too far from the border.
+In fact, this function show points close to the surface of the modified mandelbrot set. But not the mandelbrot set itself.
+
+<code class="haskell">
+depthPoints :: [ColoredPoint]
+depthPoints = do
+  x <- [-width..width]
+  y <- [-height..height]
+  let 
+      depthOf x' y' = findMaxOrdFor (mandel x' y') 0 deep 7
+      z1 = depthOf    x     y
+      z2 = depthOf (x+1)    y
+      z3 = depthOf (x+1) (y+1)
+      z4 = depthOf    x  (y+1)
+      c1 = mandel    x     y  (z1+1)
+      c2 = mandel (x+1)    y  (z2+1)
+      c3 = mandel (x+1) (y+1) (z3+1)
+      c4 = mandel    x  (y+1) (z4+1)
+      p1 = (   x /width,   y /height, z1/deep,colorFromValue c1)
+      p2 = ((x+1)/width,   y /height, z2/deep,colorFromValue c2)
+      p3 = ((x+1)/width,(y+1)/height, z3/deep,colorFromValue c3)
+      p4 = (   x /width,(y+1)/height, z4/deep,colorFromValue c4)
+  if (and $ map (>=57) [c1,c2,c3,c4])
+  then []
+  else [p1,p2,p3,p1,p3,p4]
+</code>
+
+If you look at the function above, you see a lot of common patterns.
+Haskell is very efficient to make this better.
+Here is a somehow less readable but more generic refactored function:
+
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
 >   x <- [-width..width]
 >   y <- [-height..height]
 >   let 
->       z = findMaxOrdFor (mandel x y) 0 deep 7
->       z' = findMaxOrdFor (mandel (x+1) y) 0 deep 7
->       z'' = findMaxOrdFor (mandel (x+1) (y+1)) 0 deep 7
->       z''' = findMaxOrdFor (mandel x (y+1)) 0 deep 7
->       c1 = mandel    x    y   (z+1)
->       c2 = mandel (x+1)   y   (z'+1)
->       c3 = mandel (x+1) (y+1) (z''+1)
->       c4 = mandel    x  (y+1) (z'''+1)
->       p1 = (    x/width,    y/height,  z/deep,colorFromValue c1)
->       p2 = ((x+1)/width,    y/height, z'/deep,colorFromValue c2)
->       p3 = ((x+1)/width,(y+1)/height,z''/deep,colorFromValue c3 )
->       p4 = (    x/width,(y+1)/height,z'''/deep,colorFromValue c4 )
->   if (and $ map (>=57) [c1,c2,c3,c4])
+>     depthOf (x',y') = findMaxOrdFor (mandel x' y') 0 deep 7
+>     neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
+>     -- zs are 3D points with found depth
+>     zs = map (\(x',y') -> (x',y',depthOf (x',y'))) neighbors
+>     -- ts are 3D pixels + mandel value
+>     ts = map (\(x',y',z') -> (x',y',z',mandel x' y' (z'+1))) zs
+>     -- ps are 3D opengl points + color value
+>     ps = map (\(x',y',z',c') -> 
+>         (x'/width,y'/height,z'/deep,colorFromValue c')) ts
+>   if (and $ map (\(_,_,_,c) -> c>=57) ts)
 >   then []
->   else [p1,p2,p3,p1,p3,p4]
+>   else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
 
-This function is interresting. 
-For those not used to the list monad here is a natural language version of this function:
+If you prefer the first version, then just imagine how hard it will be to change the enumeration of the point from (x,y) to (x,z) for example.
 
-~~~
-positivePoints =
-    for all x in the range [-width..width]
-    let y be smallest number s.t. mandel x y > 0
-    if y is on 0 then don't return a point
-    else return the value corresonding to (x,y,color for (x+iy))
-~~~
+Also, we didn't searched for negative values. 
+For simplicity, I mirror these values. 
+I haven't even tested if this modified mandelbrot is symetric relatively to the plan {(x,y,z)|z=0}.
 
-In fact using the list monad you write like if you consider only one element at a time and the computation is done non deterministically.
-To find the smallest number such that mandel x y > 0 we create a simple dichotomic search:
+> allPoints :: [ColoredPoint]
+> allPoints = depthPoints ++ map inverse  depthPoints
+>   where inverse (x,y,z,c) = (x,y,-z+1/deep,c)
+
+The rest of the program is very close to the preceeding one.
 
 > findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
@@ -232,7 +270,7 @@ To find the smallest number such that mandel x y > 0 we create a simple dichotom
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
 
-The new mandel function
+The new mandel function with a third dimension.
 
 > mandel x y z = 
 >   let r = 2.0 * x / width
@@ -241,6 +279,7 @@ The new mandel function
 >   in
 >       f (extcomplex r i s) 0 64
 
+I slightly made the color brighter
 
 > colorFromValue n =
 >   let 
@@ -249,8 +288,16 @@ The new mandel function
 >   in
 >     Color3 (t n) (t (n+5)) (t (n+10))
 
+We only changed from `Complex` to `ExtComplex` of the main `f` function.
+
 > f :: ExtComplex -> ExtComplex -> Int -> Int
 > f c z 0 = 0
 > f c z n = if (magnitude z > 2 ) 
 >           then n
 >           else f c ((z*z)+c) (n-1)
+
+And here is the result:
+
+blogimage("mandelbrot_3D.png","A 3D mandelbrot like")
+
+This is nice.
