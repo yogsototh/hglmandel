@@ -16,17 +16,34 @@ But it will be enough for us to create something nice.
 > import Graphics.UI.GLUT
 > import Data.IORef
 
-> type ColoredPoint = (GLfloat,GLfloat,GLfloat,Color3 GLfloat)
-
 </div>
 
-> data ExtComplex = C (GLfloat,GLfloat,GLfloat) deriving (Show,Eq)
+As the code start to be more complex, I'll use some aliases:
+
+> type ColoredPoint = (GLfloat,GLfloat,GLfloat,Color3 GLfloat)
+
+Then I declare the new type `ExtComplex` (for exttended complex). 
+An extension of complex numbers:
+
+> data ExtComplex = C (GLfloat,GLfloat,GLfloat) 
+>                   deriving (Show,Eq)
 > instance Num ExtComplex where
 >     fromInteger n = C (fromIntegral n,0.0,0.0)
->     C (x,y,u) * C (z,t,v) = C (x*z - y*t - u*v, x*t + y*z + u*v, x*v + z*u )
+>     -- The shape of the 3D mandelbrot 
+>     -- will depend on this formula
+>     C (x,y,u) * C (z,t,v) = C (x*z - y*t - u*v, 
+>                                x*t + y*z + u*v, 
+>                                x*v + z*u )
+>     -- The rest is straightforward
 >     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
 >     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
 >     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
+
+The most important part is the new multiplication instance.
+Instead of searching the holy grail of 3D Mandelbrot, I just found a nice one.
+
+Then I list some functions to use this new type:
+
 > extcomplex :: GLfloat -> GLfloat -> GLfloat -> ExtComplex
 > extcomplex x y z = C (x,y,z)
 > 
@@ -41,132 +58,137 @@ But it will be enough for us to create something nice.
 > 
 > magnitude :: ExtComplex -> GLfloat
 > magnitude = real.abs
+
+As we will use some 3D, we add some new directive in the boilerplate.
+But mainly, we simply state that will use some depth buffer.
+And also we will listen the keyboard.
+
 > main :: IO ()
 > main = do
 >   -- GLUT need to be initialized
 >   (progname,_) <- getArgsAndInitialize
 >   -- We will use the double buffered mode (GL constraint)
->   initialDisplayMode $= [WithDepthBuffer,DoubleBuffered,RGBMode]
+>   -- We also Add the DepthBuffer (for 3D)
+>   initialDisplayMode $= 
+>       [WithDepthBuffer,DoubleBuffered,RGBMode]
 >   -- We create a window with some title
->   createWindow "Mandelbrot Set with Haskell and OpenGL"
->   depthFunc $= Just Less
->   matrixMode $= Projection
+>   createWindow "3D HOpengGL Mandelbrot"
+>   -- We add some directives
+>   depthFunc  $= Just Less
+>   -- matrixMode $= Projection
 >   windowSize $= Size 500 500
->   -- Some state variables
->   angle <- newIORef (1.0 :: GLfloat)
->   delta <- newIORef (0.15 :: GLfloat)
->   zoom <- newIORef (1.00 :: GLfloat)
->   campos <- newIORef (0.0::GLfloat,0.0)
+>   -- Some state variables (I know it feels BAD)
+>   angle   <- newIORef ((1.0 :: GLfloat,0.0))
+>   zoom    <- newIORef (1.0 :: GLfloat)
+>   campos  <- newIORef (0.0 :: GLfloat,0.0)
 >   -- Action to call when waiting
->   idleCallback $= Just (idle angle delta)
->   keyboardMouseCallback $= Just (keyboardMouse delta zoom campos)
+>   idleCallback $= Just idle
+>   -- We will use the keyboard
+>   keyboardMouseCallback $= 
+>           Just (keyboardMouse angle zoom campos)
 >   -- Each time we will need to update the display
 >   -- we will call the function 'display'
+>   -- But this time, we add some parameters
 >   displayCallback $= display angle zoom campos
->   -- We put some light
->   -- lighting $= Enabled
->   -- ambient (Light 0) $= Color4 1 1 1 1
->   -- diffuse (Light 0) $= Color4 1 1 1 1
->   -- specular (Light 0) $= Color4 1 1 1 1
->   -- position (Light 0) $= Vertex4 0 1.0 0.4 1
->   -- light (Light 0) $= Enabled
 >   -- We enter the main loop
 >   mainLoop
-> idle angle delta = do
->   a <- get angle
->   d <- get delta
->   angle $=! (a + d)
+
+We rotate the shape.
+
+> idle = do
 >   postRedisplay Nothing
 
+We introduce some helper function to manipulate
+standard `IORef`.
 
-> crMat (rd,gd,bd) (rs,gs,bs) exp = do
->   materialDiffuse   Front $= Color4 rd gd bd  1.0
->   materialAmbient   Front $= Color4 rd gd bd  1.0
->   materialSpecular  Front $= Color4 rs gs bs  1.0
->   materialShininess Front $= exp
->   
->   materialDiffuse   Back $= Color4 rd gd bd  1.0
->   materialSpecular  Back $= Color4 rs gs bs  1.0
->   materialShininess Back $= exp
+> modVar v f = do
+>   v' <- get v
+>   v $= (f v')
+> mapFst f (x,y) = (f x,y)
+> mapSnd f (x,y) = (x,f y)
 
-> mainColor = crMat (0.5,0.5,0.3) (0.2,0.0,0.2) 50.0
+And we use them to code the function handling keyboard.
+We will use the keys `hjkl` to rotate, 
+`oi` to zoom and `sedf` to move.
+Also, hitting space will reset the view.
 
-> keyboardMouse delta zoom pos key state modifiers position =
->   keyboardAct delta zoom pos key state
+> keyboardMouse angle zoom pos key state modifiers position =
+>   kact angle zoom pos key state
 >   where 
->     keyboardAct d _ _ (Char ' ') Down = do
->           d' <- get d
->           d $= 0
->     keyboardAct d _ _ (Char 'j') Down = do
->           d' <- get d
->           d $= (d'+0.01)
->     keyboardAct d _ _ (Char 'k') Down = do
->           d' <- get d
->           d $= (d'-0.01)
->     keyboardAct _ s _ (Char 'o') Down = do
->           s' <- get s
->           s $= (s'*1.1)
->     keyboardAct _ s _ (Char 'i') Down = do
->           s' <- get s
->           s $= (s'*0.9)
->     keyboardAct _ _ p (Char 'f') Down = do
->           (x,y) <- get p
->           p $= (x+0.1,y)
->     keyboardAct _ _ p (Char 's') Down = do
->           (x,y) <- get p
->           p $= (x-0.1,y)
->     keyboardAct _ _ p (Char 'e') Down = do
->           (x,y) <- get p
->           p $= (x,y-0.1)
->     keyboardAct _ _ p (Char 'd') Down = do
->           (x,y) <- get p
->           p $= (x,y+0.1)
->     keyboardAct _ _ _ _ _ = return ()
+>     -- reset view when hitting space
+>     kact a z p (Char ' ') Down = do
+>           a $= (0,0)
+>           z $= 1
+>           p $= (0,0)
+>     -- use of hjkl to rotate
+>     kact a _ _ (Char 'h') Down = modVar a (mapFst (+0.5))
+>     kact a _ _ (Char 'l') Down = modVar a (mapFst (+(-0.5)))
+>     kact a _ _ (Char 'j') Down = modVar a (mapSnd (+0.5))
+>     kact a _ _ (Char 'k') Down = modVar a (mapSnd (+(-0.5)))
+>     -- use o and i to zoom
+>     kact _ s _ (Char 'o') Down = modVar s (*1.1)
+>     kact _ s _ (Char 'i') Down = modVar s (*0.9)
+>     -- use sdfe to move the camera
+>     kact _ _ p (Char 's') Down = modVar p (mapFst (+0.1))
+>     kact _ _ p (Char 'f') Down = modVar p (mapFst (+(-0.1)))
+>     kact _ _ p (Char 'd') Down = modVar p (mapSnd (+0.1))
+>     kact _ _ p (Char 'e') Down = modVar p (mapSnd (+(-0.1)))
+>     -- any other keys does nothing
+>     kact _ _ _ _ _ = return ()
+
+Now, we will show the object using the display function.
+Note, this time, display take some parameters.
+Mainly, this function if full of boilerplate:
 
 > display angle zoom position = do
->   clear [ColorBuffer,DepthBuffer] -- make the window black
+>    -- make the window black
+>   clear [ColorBuffer,DepthBuffer]
+>   -- Transformation to change the view
 >   loadIdentity -- reset any transformation
 >   (x,y) <- get position
 >   translate $ Vector3 x y 0 
 >   z <- get zoom
 >   scale z z z
->   a <- get angle
->   rotate a $ Vector3 1.0 0.0 (0.0::GLfloat)
+>   (xangle,yangle) <- get angle
+>   rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
+>   rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
+>   -- Now that all transformation were made
+>   -- We create the object(s)
 >   preservingMatrix drawMandelbrot
 >   swapBuffers -- refresh screen
-> 
-> nbDetails = 500 :: GLfloat
+
+Not much to say about this function.
+Mainly there are two parts: apply some transformations, draw the object.
+
+ ### The 3D Mandelbrot
+
+First, we will set the resolution to 180 pixels.
+
+> nbDetails = 180 :: GLfloat
 > width  = nbDetails
 > height = nbDetails
 > deep   = nbDetails
 
-
-</div>
-
-This time, instead of drawing all points, I'll simply want to draw the edges of the Mandelbrot set.
-We change slightly the drawMandelbrot function.
-We replace the `Points` by `LineLoop`
-
+This time, instead of just drawing some line or some group of points,
+we will show triangles.
+The idea is that we should provide points three by three.
 
 > drawMandelbrot = do
 >   -- We will print Points (not triangles for example) 
->   mainColor
 >   renderPrimitive Triangles $ do
 >     mapM_ drawColoredPoint allPoints
 >   where
 >       drawColoredPoint (x,y,z,c) = do
->           color c -- set the current color to c
->           -- then draw the point at position (x,y,0)
->           -- remember we're in 3D
+>           color c
 >           vertex $ Vertex3 x y z
 
-And now, we should change our list of points.
-Instead of drawing every point of the visible surface, 
-we will choose only point on the surface.
+Now instead of providing only one point at a time, we will provide six points.
 
+blogimage("triangles.png","Explain triangles")
 
 > allPoints :: [ColoredPoint]
-> allPoints = depthPoints ++ map (\(x,y,z,c) -> (x,y,-z+1/deep,c)) depthPoints
+> allPoints = depthPoints ++ map inverse  depthPoints
+>   where inverse (x,y,z,c) = (x,y,-z+1/deep,c)
 > 
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
@@ -185,7 +207,7 @@ we will choose only point on the surface.
 >       p2 = ((x+1)/width,    y/height, z'/deep,colorFromValue c2)
 >       p3 = ((x+1)/width,(y+1)/height,z''/deep,colorFromValue c3 )
 >       p4 = (    x/width,(y+1)/height,z'''/deep,colorFromValue c4 )
->   if (and $ map (>=55) [c1,c2,c3,c4])
+>   if (and $ map (>=57) [c1,c2,c3,c4])
 >   then []
 >   else [p1,p2,p3,p1,p3,p4]
 
@@ -220,8 +242,6 @@ The new mandel function
 >       f (extcomplex r i s) 0 64
 
 
-<div style="display:none">
-
 > colorFromValue n =
 >   let 
 >       t :: Int -> GLfloat
@@ -234,6 +254,3 @@ The new mandel function
 > f c z n = if (magnitude z > 2 ) 
 >           then n
 >           else f c ((z*z)+c) (n-1)
-
-</div>
-
