@@ -23,7 +23,7 @@ But it will be enough for us to create something nice.
 > data ExtComplex = C (GLfloat,GLfloat,GLfloat) deriving (Show,Eq)
 > instance Num ExtComplex where
 >     fromInteger n = C (fromIntegral n,0.0,0.0)
->     C (x,y,u) * C (z,t,v) = C (z*x - y*t, y*z + x*t, y*v - t*u)
+>     C (x,y,u) * C (z,t,v) = C (x*z - y*t - u*v, x*t + y*z + u*v, x*v + z*u )
 >     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
 >     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
 >     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
@@ -51,10 +51,10 @@ But it will be enough for us to create something nice.
 >   createWindow "Mandelbrot Set with Haskell and OpenGL"
 >   depthFunc $= Just Less
 >   matrixMode $= Projection
->   windowSize $= Size 800 800
+>   windowSize $= Size 500 500
 >   -- Some state variables
->   angle <- newIORef (0.0 :: GLfloat)
->   delta <- newIORef (0.05 :: GLfloat)
+>   angle <- newIORef (1.0 :: GLfloat)
+>   delta <- newIORef (0.15 :: GLfloat)
 >   zoom <- newIORef (1.00 :: GLfloat)
 >   campos <- newIORef (0.0::GLfloat,0.0)
 >   -- Action to call when waiting
@@ -63,12 +63,13 @@ But it will be enough for us to create something nice.
 >   -- Each time we will need to update the display
 >   -- we will call the function 'display'
 >   displayCallback $= display angle zoom campos
->   lighting $= Enabled
->   ambient (Light 0) $= Color4 1 1 1 1
->   diffuse (Light 0) $= Color4 1 1 1 1
->   specular (Light 0) $= Color4 1 1 1 1
->   position (Light 0) $= Vertex4 0 1.0 0.0 1
->   light (Light 0) $= Enabled
+>   -- We put some light
+>   -- lighting $= Enabled
+>   -- ambient (Light 0) $= Color4 1 1 1 1
+>   -- diffuse (Light 0) $= Color4 1 1 1 1
+>   -- specular (Light 0) $= Color4 1 1 1 1
+>   -- position (Light 0) $= Vertex4 0 1.0 0.4 1
+>   -- light (Light 0) $= Enabled
 >   -- We enter the main loop
 >   mainLoop
 > idle angle delta = do
@@ -134,7 +135,7 @@ But it will be enough for us to create something nice.
 >   preservingMatrix drawMandelbrot
 >   swapBuffers -- refresh screen
 > 
-> nbDetails = 100 :: GLfloat
+> nbDetails = 500 :: GLfloat
 > width  = nbDetails
 > height = nbDetails
 > deep   = nbDetails
@@ -165,7 +166,7 @@ we will choose only point on the surface.
 
 
 > allPoints :: [ColoredPoint]
-> allPoints = depthPoints ++ map (\(x,y,z,c) -> (x,y,-z,c)) depthPoints
+> allPoints = depthPoints ++ map (\(x,y,z,c) -> (x,y,-z+1/deep,c)) depthPoints
 > 
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
@@ -176,11 +177,15 @@ we will choose only point on the surface.
 >       z' = findMaxOrdFor (mandel (x+1) y) 0 deep 7
 >       z'' = findMaxOrdFor (mandel (x+1) (y+1)) 0 deep 7
 >       z''' = findMaxOrdFor (mandel x (y+1)) 0 deep 7
->       p1 = (    x/width,    y/height,  z/deep,colorFromValue $ mandel    x    y   (z+1))
->       p2 = ((x+1)/width,    y/height, z'/deep,colorFromValue $ mandel (x+1)   y   (z'+1))
->       p3 = ((x+1)/width,(y+1)/height,z''/deep,colorFromValue $ mandel (x+1) (y+1) (z''+1))
->       p4 = (    x/width,(y+1)/height,z'''/deep,colorFromValue $ mandel    x  (y+1) (z'''+1))
->   if (mandel x y (z-1) /= 0)
+>       c1 = mandel    x    y   (z+1)
+>       c2 = mandel (x+1)   y   (z'+1)
+>       c3 = mandel (x+1) (y+1) (z''+1)
+>       c4 = mandel    x  (y+1) (z'''+1)
+>       p1 = (    x/width,    y/height,  z/deep,colorFromValue c1)
+>       p2 = ((x+1)/width,    y/height, z'/deep,colorFromValue c2)
+>       p3 = ((x+1)/width,(y+1)/height,z''/deep,colorFromValue c3 )
+>       p4 = (    x/width,(y+1)/height,z'''/deep,colorFromValue c4 )
+>   if (and $ map (>=55) [c1,c2,c3,c4])
 >   then []
 >   else [p1,p2,p3,p1,p3,p4]
 
