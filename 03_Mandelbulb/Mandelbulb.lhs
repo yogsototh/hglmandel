@@ -298,6 +298,11 @@ I haven't even tested if this modified mandelbrot is symetric relatively to the 
 >       inverseHeight (x,y,z,c) = (x,-y,z,c)
 >       inverseDepth (x,y,z,c) = (x,y,-z+1/deep,c)
 
+I cheat by making these symmetry.
+But it is faster and render a nice form.
+For this tutorial it will be good enough.
+Also, the dichotomic method I use is mostly right but false for some cases.
+
 The rest of the program is very close to the preceeding one.
 
 <div style="display:none">
@@ -342,5 +347,5 @@ And here is the result (if you use 500 for `nbDetails`):
 
 blogimage("mandelbrot_3D.png","A 3D mandelbrot like")
 
-This is nice. But let's take a very high level look at our code:
+This image is quite nice.
 
