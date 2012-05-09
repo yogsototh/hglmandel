@@ -10,39 +10,66 @@ As I know almost nothing about quaternions, I will use some extended complex.
 I am pretty sure this construction is not useful for numbers.
 But it will be enough for us to create something nice.
 
+As there is a lot of code, I'll give a high level view to what occurs:
+
+ > - OpenGL Boilerplate
+ >  
+ >   - set some IORef for states  
+ >   - Drawing: 
+ > 
+ >      - set doubleBuffer, handle depth, window size...
+ >      - Use state to apply some transformations
+ >  
+ >   - Keyboard: hitting some key change the state of IORef
+ > 
+ > - Generate 3D Object
+ >
+ >   ~~~ 
+ >   allPoints :: [ColoredPoint]  
+ >   allPoints =
+ >       for all (x,y), -width<x<width, 0<y<height
+ >       Let z be the minimal depth such that
+ >           mandel x y z > 0
+ >       add the points 
+ >              (x, y, z,color) 
+ >              (x,-y, z,color) 
+ >              (x, y,-z,color) 
+ >              (x,-y,-z,color) 
+ >           + neighbors to make triangles
+ >   ~~~
+
+
+
 <div style="display:none">
 
 > import Graphics.Rendering.OpenGL
 > import Graphics.UI.GLUT
 > import Data.IORef
+> type ColoredPoint = (GLfloat,GLfloat,GLfloat,Color3 GLfloat)
 
 </div>
 
-As the code start to be more complex, I'll use some aliases:
-
-> type ColoredPoint = (GLfloat,GLfloat,GLfloat,Color3 GLfloat)
-
-Then I declare the new type `ExtComplex` (for exttended complex). 
+We declare a new type `ExtComplex` (for exttended complex). 
 An extension of complex numbers:
 
 > data ExtComplex = C (GLfloat,GLfloat,GLfloat) 
 >                   deriving (Show,Eq)
 > instance Num ExtComplex where
->     fromInteger n = C (fromIntegral n,0.0,0.0)
 >     -- The shape of the 3D mandelbrot 
 >     -- will depend on this formula
->     C (x,y,u) * C (z,t,v) = C (x*z - y*t - u*v, 
->                                x*t + y*z + u*v, 
->                                x*v + z*u )
+>     C (x,y,z) * C (x',y',z') = C (x*x' - y*y' - z*z', 
+>                                   x*y' + y*x' + z*z', 
+>                                   x*z' + z*x' )
 >     -- The rest is straightforward
->     C (x,y,u) + C (z,t,v) = C (x+z, y+t, u+v)
->     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z),0.0,0.0)
->     signum (C (x,y,z))  = C (signum x , 0.0, 0.0)
+>     fromInteger n = C (fromIntegral n, 0, 0)
+>     C (x,y,z) + C (x',y',z') = C (x+x', y+y', z+z')
+>     abs (C (x,y,z))     = C (sqrt (x*x + y*y + z*z), 0, 0)
+>     signum (C (x,y,z))  = C (signum x, 0, 0)
 
 The most important part is the new multiplication instance.
-Instead of searching the holy grail of 3D Mandelbrot, I just found a nice one.
+Modifying this formula will change radically the shape of this somehow 3D mandelbrot.
 
-Then I list some functions to use this new type:
+<div style="display:none">
 
 > extcomplex :: GLfloat -> GLfloat -> GLfloat -> ExtComplex
 > extcomplex x y z = C (x,y,z)
@@ -58,6 +85,8 @@ Then I list some functions to use this new type:
 > 
 > magnitude :: ExtComplex -> GLfloat
 > magnitude = real.abs
+
+</div>
 
 As we will use some 3D, we add some new directive in the boilerplate.
 But mainly, we simply state that will use some depth buffer.
@@ -78,9 +107,9 @@ And also we will listen the keyboard.
 >   -- matrixMode $= Projection
 >   windowSize $= Size 500 500
 >   -- Some state variables (I know it feels BAD)
->   angle   <- newIORef ((35.0 :: GLfloat,0.0))
->   zoom    <- newIORef (2.0 :: GLfloat)
->   campos  <- newIORef (0.7 :: GLfloat,0.0)
+>   angle   <- newIORef ((35,0)::(GLfloat,GLfloat))
+>   zoom    <- newIORef (2::GLfloat)
+>   campos  <- newIORef ((0.7,0)::(GLfloat,GLfloat))
 >   -- Action to call when waiting
 >   idleCallback $= Just idle
 >   -- We will use the keyboard
@@ -93,10 +122,9 @@ And also we will listen the keyboard.
 >   -- We enter the main loop
 >   mainLoop
 
-We rotate the shape.
+The `idle` function necessary for animation.
 
-> idle = do
->   postRedisplay Nothing
+> idle = postRedisplay Nothing
 
 We introduce some helper function to manipulate
 standard `IORef`.
@@ -104,8 +132,8 @@ standard `IORef`.
 > modVar v f = do
 >   v' <- get v
 >   v $= (f v')
-> mapFst f (x,y) = (f x,y)
-> mapSnd f (x,y) = (x,f y)
+> mapFst f (x,y) = (f x,  y)
+> mapSnd f (x,y) = (  x,f y)
 
 And we use them to code the function handling keyboard.
 We will use the keys `hjkl` to rotate, 
@@ -141,15 +169,18 @@ Note, this time, display take some parameters.
 Mainly, this function if full of boilerplate:
 
 > display angle zoom position = do
->    -- set the background color
+>    -- set the background color (dark solarized theme)
 >   clearColor $= Color4 0 0.1686 0.2117 1
 >   clear [ColorBuffer,DepthBuffer]
 >   -- Transformation to change the view
 >   loadIdentity -- reset any transformation
+>   -- tranlate
 >   (x,y) <- get position
 >   translate $ Vector3 x y 0 
+>   -- zoom
 >   z <- get zoom
 >   scale z z z
+>   -- rotate
 >   (xangle,yangle) <- get angle
 >   rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
 >   rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
@@ -163,9 +194,11 @@ Mainly there are two parts: apply some transformations, draw the object.
 
  ### The 3D Mandelbrot
 
-First, we will set the resolution to 180 pixels.
+Now, that we talked about the OpenGL part, let's talk about how we 
+generate the 3D points and colors.
+First, we will set the number of detatils to 180 pixels in the three dimensions.
 
-> nbDetails = 130 :: GLfloat
+> nbDetails = 200 :: GLfloat
 > width  = nbDetails
 > height = nbDetails
 > deep   = nbDetails
@@ -185,7 +218,6 @@ The idea is that we should provide points three by three.
 
 Now instead of providing only one point at a time, we will provide six ordered points. 
 These points will be used to draw two triangles.
-
 
 blogimage("triangles.png","Explain triangles")
 
@@ -236,19 +268,21 @@ Here is a somehow less readable but more generic refactored function:
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
 >   x <- [-width..width]
->   y <- [-height..height]
+>   y <- [0..height]
 >   let 
->     depthOf (x',y') = findMaxOrdFor (mandel x' y') 0 deep 7
 >     neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
+>     depthOf (u,v) = findMaxOrdFor (mandel u v) 0 deep 7
 >     -- zs are 3D points with found depth
->     zs = map (\(x',y') -> (x',y',depthOf (x',y'))) neighbors
+>     zs = map (\(u,v) -> (u,v,depthOf (u,v))) neighbors
 >     -- ts are 3D pixels + mandel value
->     ts = map (\(x',y',z') -> (x',y',z',mandel x' y' (z'+1))) zs
+>     ts = map (\(u,v,w) -> (u,v,w,mandel u v (w+1))) zs
 >     -- ps are 3D opengl points + color value
->     ps = map (\(x',y',z',c') -> 
->         (x'/width,y'/height,z'/deep,colorFromValue c')) ts
+>     ps = map (\(u,v,w,c') -> 
+>         (u/width,v/height,w/deep,colorFromValue c')) ts
+>   -- If the point diverged too fast, don't display it
 >   if (and $ map (\(_,_,_,c) -> c>=57) ts)
 >   then []
+>   -- Draw two triangles
 >   else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
 
 If you prefer the first version, then just imagine how hard it will be to change the enumeration of the point from (x,y) to (x,z) for example.
@@ -258,10 +292,15 @@ For simplicity, I mirror these values.
 I haven't even tested if this modified mandelbrot is symetric relatively to the plan {(x,y,z)|z=0}.
 
 > allPoints :: [ColoredPoint]
-> allPoints = depthPoints ++ map inverse  depthPoints
->   where inverse (x,y,z,c) = (x,y,-z+1/deep,c)
+> allPoints = planPoints ++ map inverseDepth  planPoints
+>   where 
+>       planPoints = depthPoints ++ map inverseHeight depthPoints
+>       inverseHeight (x,y,z,c) = (x,-y,z,c)
+>       inverseDepth (x,y,z,c) = (x,y,-z+1/deep,c)
 
 The rest of the program is very close to the preceeding one.
+
+<div style="display:none">
 
 > findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
@@ -270,16 +309,7 @@ The rest of the program is very close to the preceeding one.
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
 
-The new mandel function with a third dimension.
-
-> mandel x y z = 
->   let r = 2.0 * x / width
->       i = 2.0 * y / height
->       s = 2.0 * z / deep
->   in
->       f (extcomplex r i s) 0 64
-
-I slightly made the color brighter
+I made the color slightly brighter
 
 > colorFromValue n =
 >   let 
@@ -296,8 +326,21 @@ We only changed from `Complex` to `ExtComplex` of the main `f` function.
 >           then n
 >           else f c ((z*z)+c) (n-1)
 
-And here is the result:
+</div>
+
+We simply add a new dimenstion to the mandel function. Also we simply need to change the type signature of the function `f` from `Complex` to `ExtComplex`.
+
+> mandel x y z = 
+>   let r = 2.0 * x / width
+>       i = 2.0 * y / height
+>       s = 2.0 * z / deep
+>   in
+>       f (extcomplex r i s) 0 64
+
+
+And here is the result (if you use 500 for `nbDetails`):
 
 blogimage("mandelbrot_3D.png","A 3D mandelbrot like")
 
-This is nice.
+This is nice. But let's take a very high level look at our code:
+
