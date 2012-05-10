@@ -43,7 +43,7 @@ tags:
   - functional
   - tutorial
 -----
-blogimage("main.png","Mandelbrot set")
+blogimage("mandelbrot_3D.png","3D Mandelbrot Set")
 
 begindiv(intro)
 
@@ -52,7 +52,7 @@ fr: %tlal Un exemple progressif de programmation avec Haskell.
 
 END
 
-# writeTOC
+writeTOC
 
 cat <<END
 
