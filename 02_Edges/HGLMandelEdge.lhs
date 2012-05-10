@@ -37,6 +37,8 @@
 >   -- We enter the main loop
 >   mainLoop
 > display = do
+>    -- set the background color (dark solarized theme)
+>   clearColor $= Color4 0 0.1686 0.2117 1
 >   clear [ColorBuffer] -- make the window black
 >   loadIdentity -- reset any transformation
 >   preservingMatrix drawMandelbrot
@@ -67,7 +69,8 @@ And now, we should change our list of points.
 Instead of drawing every point of the visible surface, 
 we will choose only point on the surface.
 
-> allPoints = positivePoints ++ map (\(x,y,c) -> (x,-y,c)) (reverse positivePoints)
+> allPoints = positivePoints ++ 
+>       map (\(x,y,c) -> (x,-y,c)) (reverse positivePoints)
 
 We only need to compute the positive point.
 The mandelbrot set is symetric on the abscisse axis.
@@ -105,7 +108,7 @@ To find the smallest number such that mandel x y > 0 we create a simple dichotom
 No rocket science here.
 See the result now:
 
-blogimage("HGLMandelEdge.png","The edge of the mandelbrot set")
+blogimage("HGLMandelEdges.png","The edges of the mandelbrot set")
 
 <div style="display:none">
 
