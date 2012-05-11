@@ -5,9 +5,9 @@ part from the computation of the shape.
 Here is the cleaned version of the preceeding section.
 Most boilerplate was put in external files.
 
-- [`YBoiler.hs`](code/YBoiler.hs), the 3D rendering
-- [`Mandel`](code/Mandel.hs), the mandel function
-- [`ExtComplex`](code/ExtComplex.hs), the extended complexes
+- [`YBoiler.hs`](code/04_Mandelbulb/YBoiler.hs), the 3D rendering
+- [`Mandel`](code/04_Mandelbulb/Mandel.hs), the mandel function
+- [`ExtComplex`](code/04_Mandelbulb/ExtComplex.hs), the extended complexes
 
 > import YBoiler -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
