@@ -5,25 +5,14 @@ function writeTOC() {
 cat <<END
 > <center><hr style="width:30%;float:left;border-color:#CCCCD0;margin-top:1em"/><span class="sc"><b>Table of Content</b></span><hr style="width:30%;float:right;border-color:#CCCCD0;margin-top:1em"/></center>
 > 
-> begindiv(toc)
+> * This will be replaced by the ToC
+> {:toc}
 >
 END
 
-
-    # get a list of 
-    # depth anchor name
-    grep -e '<h.' **/*.lhs | perl -pe 's#.*<h([2-6]) id="#\1 #;s#"[^>]*># "#; s#<.*#"#' |
-    while read num anchor title; do
-        print -n -- '> '
-        while ((num-->2)); do print -n -- "  "; done
-        print -- '* <a href="#'$anchor'">'${title[2,-2]}'</a>'
-    done
-
-cat <<END
->
-> enddiv
-END
 }
+
+
 
 cat <<END
 -----
