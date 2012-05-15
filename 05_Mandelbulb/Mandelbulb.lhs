@@ -61,13 +61,6 @@ It means, the user input will transform the world state.
 And of course a type design the World State:
 
 > -- I prefer to set my own name for these types
-> Point   = GLfloat 
-> Scalar  = GLfloat
-> data Point3D = Point3D { 
->             x :: Point,
->             y :: Point,
->             z :: Point }
-> type Function3D = Point -> Point -> Point
 > data World = World {
 >       angle       :: Point3D
 >     , zoom        :: Point1D

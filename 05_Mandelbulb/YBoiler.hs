@@ -1,10 +1,9 @@
 -- An OpenGL boilerplate
-module YBoiler (GLfloat,yMainLoop,ColoredPoint,Color3) where
+module YBoiler (GLfloat,yMainLoop,ColoredPoint,Color3,ViewState) where
 
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import Data.IORef
-
 
 yMainLoop :: String -> InputMap  -> worldType -> IO ()
 yMainLoop windowTitle inputActionMap world = do

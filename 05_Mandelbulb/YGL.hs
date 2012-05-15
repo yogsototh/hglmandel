@@ -1,4 +1,11 @@
-module YGL (GLfloat,yMainLoop,InputMap,inputMapFromList) where
+module YGL (
+    Point
+    , Scalar
+    , Point3D
+    , Function3D
+    , yMainLoop
+    , InputMap
+    , inputMapFromList) where
 
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
@@ -11,6 +18,64 @@ import qualified Data.Map as Map
 type InputMap worldType = Map.Map UserInput (worldType -> worldType)
 data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
 
+type Point   = GLfloat 
+type Scalar  = GLfloat
+data Point3D = Point3D { 
+      xpoint :: Point
+    , ypoint :: Point
+    , zpoint :: Point }
+type Function3D = Point -> Point -> Maybe Point
+
+data ViewState = ViewState {
+      camera  :: Camera
+    , objects :: [Object3D] }
+
+data Camera = Camera {
+          xcam :: Point
+        , ycam :: Point
+        , zcam :: Point
+        }
+data Object3D = [Point3D]
+data Box3D = R {
+       minPoint :: Point3D 
+       maxPoint :: Point3D
+    }
+
+-- Given a shape function and a delimited Box3D
+-- return a list of Triangles to be displayed
+getObject3DFromShapeFunction :: Function3D -> Box3D -> [Point3D]
+getObject3DFromShapeFunction shape box =
+  x <- [xmin..xmax]
+  y <- [ymin..ymax]
+  let 
+    neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
+    -- zs are 3D points with found depth
+    zs = map (\(u,v) -> (u,v,shape u v)) neighbors
+    -- ps are 3D opengl points + color value
+    ps = map (\(u,v,w,c') -> 
+        (u/width,v/height,w/depth)) zs
+  -- If the point diverged too fast, don't display it
+  if (and $ map (\(_,_,z) -> z==Nothing) ts)
+  then []
+  -- Draw two triangles
+  --    3 - 2
+  --    | / |
+  --    0 - 1
+  else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
+  where
+    -- some naming to make it 
+    -- easier to read
+    xmin = xpoint minPoint box
+    xmax = xpoint maxPoint box
+    width = xmax - xmin
+    ymin = ypoint minPoint box
+    ymay = ypoint mayPoint box
+    height = ymax - ymin
+    zmin = zpoint minPoint box
+    zmaz = zpoint mazPoint box
+    depth = zmax - zmin
+
+
 inputMapFromList = Map.fromList
 
 -- We set our mainLoop function
@@ -18,8 +83,16 @@ inputMapFromList = Map.fromList
 -- This can be perceived as BAD.
 -- But I wanted to use the imperative GLUT library
 -- We have no choice for now.
-yMainLoop :: String -> InputMap  -> worldType -> IO ()
-yMainLoop windowTitle inputActionMap world = do
+yMainLoop :: String       -- window name
+             -> InputMap  -- the mapping user input / world
+             -> worldType -- the world state
+             -> (worldType -> ViewState) -- a function from world state to view
+             -> IO ()     -- into IO () for obvious reason
+yMainLoop windowTitle 
+          inputActionMap 
+          camera 
+          world 
+          viewFromWorld = do
   -- The boilerplate
   (progname,_) <- getArgsAndInitialize
   initialDisplayMode $= 
@@ -35,13 +108,15 @@ yMainLoop windowTitle inputActionMap world = do
   keyboardMouseCallback $= 
           Just (keyboardMouse inputActionMap worldRef)
   -- We generate one frame using the callback
-  displayCallback $= display worldRef
+  displayCallback $= display viewFromWorld worldRef
   -- We enter the main loop
   mainLoop
 
+-- When no user input entered do nothing
 idle = postRedisplay Nothing
 
 -- Get User Input
+-- both cleaner, terser and more expendable than the preceeding code
 keyboardMouse input world state modifiers position =
     if modifiers == Down
     then
@@ -53,27 +128,32 @@ keyboardMouse input world state modifiers position =
 
 
 -- The function that will display datas
-display world = do
-  w <- get world
-   -- set the background color (dark solarized theme)
-  clearColor $= Color4 0 0.1686 0.2117 1
-  clear [ColorBuffer,DepthBuffer]
-  -- Transformation to change the view
-  loadIdentity -- reset any transformation
-  -- tranlate
-  let (x,y,z) = position w
-      s = zoom w
-      (xangle,yangle,zangle) = angle w
-  translate $ Vector3 x y z 
-  scale s s s
-  rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
-  rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
-  rotate zangle $ Vector3 0.0 0.0 (1.0::GLfloat)
-  -- Now that all transformation were made
-  -- We create the object(s)
-  t <- get elapsedTime
-  preservingMatrix $ drawObject (triangles t)
-  swapBuffers -- refresh screen
+display worldRef getViewFromWorld = do
+    -- BEWAREA UGLINESS!!!!
+    -- SHOULD NEVER MODIFY worldRef HERE!!!!
+    w <- get worldRef
+    let view = getViewFromWorld w
+    -- set the background color (dark solarized theme)
+    clearColor $= Color4 0 0.1686 0.2117 1
+    clear [ColorBuffer,DepthBuffer]
+    -- Transformation to change the view
+    loadIdentity -- reset any transformation
+    -- tranlate
+    (x,y) <- get position
+    translate $ Vector3 x y 0 
+    -- zoom
+    z <- get zoom
+    scale z z z
+    -- rotate
+    (xangle,yangle,zangle) <- get angle
+    rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
+    rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
+    rotate zangle $ Vector3 0.0 0.0 (1.0::GLfloat)
+    -- Now that all transformation were made
+    -- We create the object(s)
+    t <- get elapsedTime
+    preservingMatrix $ drawObject (triangles t)
+    swapBuffers -- refresh screen
 
 -- The function that will display datas
 display angle zoom position triangles = do
@@ -99,40 +179,10 @@ display angle zoom position triangles = do
   preservingMatrix $ drawObject (shape w)
   swapBuffers -- refresh screen
 
-red   (r,_,_) = r
-green (_,g,_) = g
-blue  (_,_,b) = b
-
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
-    mapM_ drawColoredPoint triangles
+    mapM_ drawPoint triangles
   where
-      drawColoredPoint (x,y,z) = vertex $ Vertex3 x y z
-      triangles = allPoints
-
-depthPoints :: Scalar -> Scalar -> Function3D -> [ColoredPoint]
-depthPoints width height shape = do
-  x <- [-width..width]
-  y <- [0..height]
-  let 
-    neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
-    -- zs are 3D points with found depth
-    zs = map (\(u,v) -> (u,v,shape u v)) neighbors
-    -- ts are 3D pixels + mandel value
-    ts = map (\(u,v,w) -> (u,v,w,ymandel u v (w+1))) zs
-    -- ps are 3D opengl points + color value
-    ps = map (\(u,v,w,c') -> 
-        (u/width,v/height,w/depth,colorFromValue c')) ts
-  -- If the point diverged too fast, don't display it
-  if (and $ map (\(_,_,_,c) -> c>=57) ts)
-  then []
-  -- Draw two triangles
-  else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
-
-allPoints :: [ColoredPoint]
-allPoints = planPoints ++ map inverseDepth  planPoints
-  where 
-      planPoints = depthPoints ++ map inverseHeight depthPoints
-      inverseHeight (x,y,z,c) = (x,-y,z,c)
-      inverseDepth (x,y,z,c) = (x,y,-z+1/depth,c)
+      drawPoint (x,y,z) = vertex $ Vertex3 x y z
+      triangles = getObject3DFromShapeFunction shape 
