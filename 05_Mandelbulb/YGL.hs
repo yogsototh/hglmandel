@@ -13,22 +13,40 @@ import Data.IORef
 import Data.Map ((!))
 import qualified Data.Map as Map
 
--- We decalre the input map type we need here
--- It is our API
-type InputMap worldType = Map.Map UserInput (worldType -> worldType)
-data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
-
+-- | A 1D point
 type Point   = GLfloat 
+-- | A Scalar value
 type Scalar  = GLfloat
+-- | A 3D Point mainly '(x,y,z)'
 data Point3D = Point3D { 
       xpoint :: Point
     , ypoint :: Point
     , zpoint :: Point }
-type Function3D = Point -> Point -> Maybe Point
 
-data ViewState = ViewState {
-      camera  :: Camera
-    , objects :: [Object3D] }
+class YObject a where
+    triangles a :: Box3D -> [Points3D]
+
+type Function3D = Point -> Point -> Maybe Point
+instance YObject Function3D
+    triangles = flip getObject3DFromShapeFunction
+
+-- | We decalre the input map type we need here
+-- | It is our API
+type InputMap worldType = Map.Map UserInput (worldType -> worldType)
+data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
+
+-- | A displayable world 
+class DisplayableWorld a where
+    camera  :: a -> Camera
+    objects :: a -> [YObject]
+
+data Camera = Camera {
+          position  :: Point3D
+        , direction :: Point3D
+        , zoom      :: Scalar
+    }
+
+
 
 data Camera = Camera {
           xcam :: Point
@@ -40,6 +58,9 @@ data Box3D = R {
        minPoint :: Point3D 
        maxPoint :: Point3D
     }
+zero3D = Point3D { xpoint = 0, ypoint = 0, zpoint = 0}
+one3D = Point3D { xpoint = 1, ypoint = 1, zpoint = 1}
+unityBox = { zero3D, one3D }
 
 -- Given a shape function and a delimited Box3D
 -- return a list of Triangles to be displayed
@@ -182,7 +203,6 @@ display angle zoom position triangles = do
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
-    mapM_ drawPoint triangles
+    mapM_ drawPoint (triangles unityBox shape)
   where
       drawPoint (x,y,z) = vertex $ Vertex3 x y z
-      triangles = getObject3DFromShapeFunction shape 
