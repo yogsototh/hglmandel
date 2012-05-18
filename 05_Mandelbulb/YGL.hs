@@ -79,12 +79,12 @@ data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
                  deriving (Eq,Ord,Show,Read)
 
 -- | A displayable world 
-class DisplayableWorld a where
-    camera :: a -> Camera
+class DisplayableWorld world where
+    camera :: world -> Camera
     camera _ = defaultCamera 
-    lights :: a -> [Light]
+    lights :: world -> [Light]
     lights _ = []
-    objects :: (YObject o) => a -> [o]
+    objects :: (YObject obj) => world -> [obj]
     objects _ = []
 
 -- | the Camera type to know how to
@@ -225,7 +225,8 @@ display worldRef = do
     preservingMatrix $ mapM drawObject objs
     swapBuffers -- refresh screen
 
-drawObject :: (YObject o) => o -> IO ()
+-- drawObject :: (YObject obj) => obj -> IO()
+drawObject :: Function3D -> IO()
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
