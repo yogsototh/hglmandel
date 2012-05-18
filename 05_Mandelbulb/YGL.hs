@@ -37,8 +37,11 @@ data Point3D = Point3D {
 makePoint3D :: (Scalar,Scalar,Scalar) -> Point3D
 makePoint3D (x,y,z) = Point3D {xpoint=x, ypoint=y, zpoint=z}
 
-toGLPoint :: Point3D -> Vector3 GLfloat
-toGLPoint p = Vector3 (xpoint p) (ypoint p) (zpoint p)
+toGLVector3 :: Point3D -> Vector3 GLfloat
+toGLVector3 p = Vector3 (xpoint p) (ypoint p) (zpoint p)
+
+toGLVertex3 :: Point3D -> Vertex3 GLfloat
+toGLVertex3 p = Vertex3 (xpoint p) (ypoint p) (zpoint p)
 
 -- | The Box3D type represent a 3D bounding box
 -- | Note if minPoint = (x,y,z) and maxPoint = (x',y',z')
@@ -46,11 +49,13 @@ toGLPoint p = Vector3 (xpoint p) (ypoint p) (zpoint p)
 -- | x<x' & y<y' & z<z'
 data Box3D = Box3D {
          minPoint :: Point3D 
-       , maxPoint :: Point3D }
+       , maxPoint :: Point3D
+       , resolution :: Scalar }
 
-makeBox mini maxi = Box3D {
+makeBox mini maxi resolution = Box3D {
       minPoint = makePoint3D mini
-    , maxPoint = makePoint3D maxi }
+    , maxPoint = makePoint3D maxi
+    , resolution = resolution  }
 
 -- | We want to be able to create object with 
 -- | many different ways.
@@ -70,7 +75,8 @@ instance YObject Function3D where
 -- | We decalre the input map type we need here
 -- | It is our API
 type InputMap worldType = Map.Map UserInput (worldType -> worldType)
-data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
+data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char 
+                 deriving (Eq,Ord,Show,Read)
 
 -- | A displayable world 
 class DisplayableWorld a where
@@ -98,15 +104,16 @@ defaultCamera = Camera {
 -- return a list of Triangles to be displayed
 getObject3DFromShapeFunction :: Function3D -> Box3D -> [Point3D]
 getObject3DFromShapeFunction shape box = do
-  x <- [xmin..xmax]
-  y <- [ymin..ymax]
+  x <- [xmin,xmin+res..xmax]
+  y <- [ymin,ymin+res..ymax]
   let 
     neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
     -- zs are 3D points with found depth
     zs = map (\(u,v) -> (u,v,shape u v)) neighbors
     -- ps are 3D opengl points + color value
-    ps = map (\(u,v,w,c') -> 
-        (u/width,v/height,w/depth)) zs
+    removeMaybe (u,v,Just w) = (u,v,w)
+    removeMaybe (u,v,Nothing) = (0,0,0)
+    ps = map removeMaybe zs
   -- If the point diverged too fast, don't display it
   if (and $ map (\(_,_,z) -> z==Nothing) zs)
   then []
@@ -114,20 +121,22 @@ getObject3DFromShapeFunction shape box = do
   --    3 - 2
   --    | / |
   --    0 - 1
-  else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
+  else map makePoint3D [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
   where
     -- some naming to make it 
     -- easier to read
-    xmin = xpoint minPoint box
-    xmax = xpoint maxPoint box
+    xmin = xpoint $ minPoint box
+    xmax = xpoint $ maxPoint box
     width = xmax - xmin
-    ymin = ypoint minPoint box
-    ymax = ypoint maxPoint box
+    ymin = ypoint $ minPoint box
+    ymax = ypoint $ maxPoint box
     height = ymax - ymin
-    zmin = zpoint minPoint box
-    zmax = zpoint maxPoint box
+    zmin = zpoint $ minPoint box
+    zmax = zpoint $ maxPoint box
     depth = zmax - zmin
+    res = resolution box
 
+inputMapFromList :: (DisplayableWorld world) => [(UserInput,world -> world)] -> InputMap world
 inputMapFromList = Map.fromList
 
 {-- 
@@ -144,7 +153,6 @@ yMainLoop :: (DisplayableWorld worldType) =>
              -> IO ()     -- into IO () for obvious reason
 yMainLoop windowTitle 
           inputActionMap 
-          camera 
           world = do
   -- The boilerplate
   (progname,_) <- getArgsAndInitialize
@@ -170,10 +178,14 @@ idle = postRedisplay Nothing
 
 -- Get User Input
 -- both cleaner, terser and more expendable than the preceeding code
-keyboardMouse input world state modifiers position =
-    if modifiers == Down
+keyboardMouse :: InputMap a -> (IORef a) 
+                 -> Key -> KeyState -> Modifiers -> Position -> IO()
+keyboardMouse input world key state modifiers position =
+    if state == Down
     then
-         let transformator = input ! (Press state)
+         let 
+            charFromKey (Char c) = c
+            transformator = input ! (Press (charFromKey key))
          in do
             w <- get world
             world $= (transformator w)
@@ -181,7 +193,7 @@ keyboardMouse input world state modifiers position =
 
 
 -- The function that will display datas
-display worldRef getViewFromWorld = do
+display worldRef = do
     -- BEWARE UGLINESS!!!!
     -- SHOULD NEVER MODIFY worldRef HERE!!!!
     --
@@ -198,7 +210,7 @@ display worldRef getViewFromWorld = do
     -- Transformation to change the view
     loadIdentity -- reset any transformation
     -- tranlate
-    translate $ toGLPoint (position cam)
+    translate $ toGLVector3 (camPos cam)
     -- zoom
     scale (camZoom cam) (camZoom cam) (camZoom cam)
     -- rotate
@@ -208,13 +220,16 @@ display worldRef getViewFromWorld = do
     -- Now that all transformation were made
     -- We create the object(s)
     t <- get elapsedTime
-    preservingMatrix $ drawObject (objects w)
+    let 
+        objs = objects w
+    preservingMatrix $ mapM drawObject objs
     swapBuffers -- refresh screen
 
+drawObject :: (YObject o) => o -> IO ()
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
-    mapM_ drawPoint (triangles unityBox shape)
+    mapM_ drawPoint (triangles shape unityBox)
   where
-    drawPoint (x,y,z) = vertex $ Vertex3 x y z
-    unityBox = makeBox (0,0,0) (1,1,1)
+    drawPoint p = vertex (toGLVertex3 p)
+    unityBox = makeBox ((-2),(-2),(-2)) (2,2,2) 0.2 
