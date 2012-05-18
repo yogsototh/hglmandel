@@ -1,5 +1,9 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module YGL (
     Point
+    , DisplayableWorld
+    , Camera
+    , YObject
     , Scalar
     , Point3D
     , Function3D
@@ -13,6 +17,13 @@ import Data.IORef
 import Data.Map ((!))
 import qualified Data.Map as Map
 
+{-- Things start to be complex here.
+- Just take the time to follow me.
+--}
+
+{-- A lot of declaration that I find helpful,
+- I don't like default naming convention --}
+
 -- | A 1D point
 type Point   = GLfloat 
 -- | A Scalar value
@@ -23,12 +34,38 @@ data Point3D = Point3D {
     , ypoint :: Point
     , zpoint :: Point }
 
-class YObject a where
-    triangles a :: Box3D -> [Points3D]
+makePoint3D :: (Scalar,Scalar,Scalar) -> Point3D
+makePoint3D (x,y,z) = Point3D {xpoint=x, ypoint=y, zpoint=z}
 
+toGLPoint :: Point3D -> Vector3 GLfloat
+toGLPoint p = Vector3 (xpoint p) (ypoint p) (zpoint p)
+
+-- | The Box3D type represent a 3D bounding box
+-- | Note if minPoint = (x,y,z) and maxPoint = (x',y',z')
+-- | Then to have a non empty box you must have
+-- | x<x' & y<y' & z<z'
+data Box3D = Box3D {
+         minPoint :: Point3D 
+       , maxPoint :: Point3D }
+
+makeBox mini maxi = Box3D {
+      minPoint = makePoint3D mini
+    , maxPoint = makePoint3D maxi }
+
+-- | We want to be able to create object with 
+-- | many different ways.
+-- | We then made a type class.
+-- | A type is in the YObject class if we declare
+-- | a function triangles which take this type
+-- | and a bounded box, and return a list of triangles.
+class YObject objectType where
+    triangles :: objectType -> Box3D -> [Point3D]
+
+-- | We declare Function3D as f(x,y) -> z
 type Function3D = Point -> Point -> Maybe Point
-instance YObject Function3D
-    triangles = flip getObject3DFromShapeFunction
+instance YObject Function3D where
+    -- | The details of the code somewhere else
+    triangles = getObject3DFromShapeFunction
 
 -- | We decalre the input map type we need here
 -- | It is our API
@@ -37,35 +74,30 @@ data UserInput = Press Char | Ctrl Char | Alt Char | CtrlAlt Char
 
 -- | A displayable world 
 class DisplayableWorld a where
-    camera  :: a -> Camera
-    objects :: a -> [YObject]
+    camera :: a -> Camera
+    camera _ = defaultCamera 
+    lights :: a -> [Light]
+    lights _ = []
+    objects :: (YObject o) => a -> [o]
+    objects _ = []
 
+-- | the Camera type to know how to
+-- | Transform the scene to see the right view.
 data Camera = Camera {
-          position  :: Point3D
-        , direction :: Point3D
-        , zoom      :: Scalar
-    }
+          camPos  :: Point3D
+        , camDir  :: Point3D
+        , camZoom :: Scalar }
 
+defaultCamera = Camera {
+      camPos = makePoint3D (0,0,0)
+    , camDir = makePoint3D (0,0,0)
+    , camZoom = 1 }
 
-
-data Camera = Camera {
-          xcam :: Point
-        , ycam :: Point
-        , zcam :: Point
-        }
-data Object3D = [Point3D]
-data Box3D = R {
-       minPoint :: Point3D 
-       maxPoint :: Point3D
-    }
-zero3D = Point3D { xpoint = 0, ypoint = 0, zpoint = 0}
-one3D = Point3D { xpoint = 1, ypoint = 1, zpoint = 1}
-unityBox = { zero3D, one3D }
 
 -- Given a shape function and a delimited Box3D
 -- return a list of Triangles to be displayed
 getObject3DFromShapeFunction :: Function3D -> Box3D -> [Point3D]
-getObject3DFromShapeFunction shape box =
+getObject3DFromShapeFunction shape box = do
   x <- [xmin..xmax]
   y <- [ymin..ymax]
   let 
@@ -76,7 +108,7 @@ getObject3DFromShapeFunction shape box =
     ps = map (\(u,v,w,c') -> 
         (u/width,v/height,w/depth)) zs
   -- If the point diverged too fast, don't display it
-  if (and $ map (\(_,_,z) -> z==Nothing) ts)
+  if (and $ map (\(_,_,z) -> z==Nothing) zs)
   then []
   -- Draw two triangles
   --    3 - 2
@@ -90,30 +122,30 @@ getObject3DFromShapeFunction shape box =
     xmax = xpoint maxPoint box
     width = xmax - xmin
     ymin = ypoint minPoint box
-    ymay = ypoint mayPoint box
+    ymax = ypoint maxPoint box
     height = ymax - ymin
     zmin = zpoint minPoint box
-    zmaz = zpoint mazPoint box
+    zmax = zpoint maxPoint box
     depth = zmax - zmin
-
 
 inputMapFromList = Map.fromList
 
--- We set our mainLoop function
--- As you can see it is _not_ functional!
--- This can be perceived as BAD.
--- But I wanted to use the imperative GLUT library
--- We have no choice for now.
-yMainLoop :: String       -- window name
-             -> InputMap  -- the mapping user input / world
+{-- 
+- We set our mainLoop function
+- As you can see the code is _not_ pure 
+- and not even functionnal friendly!
+- But when called,
+- it will look like a standard function.
+--}
+yMainLoop :: (DisplayableWorld worldType) =>
+             String       -- window name
+             -> InputMap worldType -- the mapping user input / world
              -> worldType -- the world state
-             -> (worldType -> ViewState) -- a function from world state to view
              -> IO ()     -- into IO () for obvious reason
 yMainLoop windowTitle 
           inputActionMap 
           camera 
-          world 
-          viewFromWorld = do
+          world = do
   -- The boilerplate
   (progname,_) <- getArgsAndInitialize
   initialDisplayMode $= 
@@ -129,7 +161,7 @@ yMainLoop windowTitle
   keyboardMouseCallback $= 
           Just (keyboardMouse inputActionMap worldRef)
   -- We generate one frame using the callback
-  displayCallback $= display viewFromWorld worldRef
+  displayCallback $= display worldRef
   -- We enter the main loop
   mainLoop
 
@@ -150,59 +182,39 @@ keyboardMouse input world state modifiers position =
 
 -- The function that will display datas
 display worldRef getViewFromWorld = do
-    -- BEWAREA UGLINESS!!!!
+    -- BEWARE UGLINESS!!!!
     -- SHOULD NEVER MODIFY worldRef HERE!!!!
+    --
+    -- I SAID NEVER.
     w <- get worldRef
-    let view = getViewFromWorld w
+    -- NO REALLY, NEVER!!!!
+    -- If someone write a line starting by
+    -- w $= ... Shoot him immediately in the head
+    --          and refere to competent authorities
+    let cam = camera w
     -- set the background color (dark solarized theme)
     clearColor $= Color4 0 0.1686 0.2117 1
     clear [ColorBuffer,DepthBuffer]
     -- Transformation to change the view
     loadIdentity -- reset any transformation
     -- tranlate
-    (x,y) <- get position
-    translate $ Vector3 x y 0 
+    translate $ toGLPoint (position cam)
     -- zoom
-    z <- get zoom
-    scale z z z
+    scale (camZoom cam) (camZoom cam) (camZoom cam)
     -- rotate
-    (xangle,yangle,zangle) <- get angle
-    rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
-    rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
-    rotate zangle $ Vector3 0.0 0.0 (1.0::GLfloat)
+    rotate (xpoint (camDir cam)) $ Vector3 1.0 0.0 (0.0::GLfloat)
+    rotate (ypoint (camDir cam)) $ Vector3 0.0 1.0 (0.0::GLfloat)
+    rotate (zpoint (camDir cam)) $ Vector3 0.0 0.0 (1.0::GLfloat)
     -- Now that all transformation were made
     -- We create the object(s)
     t <- get elapsedTime
-    preservingMatrix $ drawObject (triangles t)
+    preservingMatrix $ drawObject (objects w)
     swapBuffers -- refresh screen
-
--- The function that will display datas
-display angle zoom position triangles = do
-   -- set the background color (dark solarized theme)
-  clearColor $= Color4 0 0.1686 0.2117 1
-  clear [ColorBuffer,DepthBuffer]
-  -- Transformation to change the view
-  loadIdentity -- reset any transformation
-  -- tranlate
-  (x,y) <- get position
-  translate $ Vector3 x y 0 
-  -- zoom
-  z <- get zoom
-  scale z z z
-  -- rotate
-  (xangle,yangle,zangle) <- get angle
-  rotate xangle $ Vector3 1.0 0.0 (0.0::GLfloat)
-  rotate yangle $ Vector3 0.0 1.0 (0.0::GLfloat)
-  rotate zangle $ Vector3 0.0 0.0 (1.0::GLfloat)
-  -- Now that all transformation were made
-  -- We create the object(s)
-  t <- get elapsedTime
-  preservingMatrix $ drawObject (shape w)
-  swapBuffers -- refresh screen
 
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
     mapM_ drawPoint (triangles unityBox shape)
   where
-      drawPoint (x,y,z) = vertex $ Vertex3 x y z
+    drawPoint (x,y,z) = vertex $ Vertex3 x y z
+    unityBox = makeBox (0,0,0) (1,1,1)
