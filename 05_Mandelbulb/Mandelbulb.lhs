@@ -65,7 +65,6 @@ And of course a type design the World State:
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
->     , details     :: Point3D
 >     , shape       :: Function3D
 >     } 
 
@@ -74,6 +73,7 @@ And of course a type design the World State:
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
+>   objects w = [XYFunc (shape w)]
 
 With all associated functions:
 
@@ -111,34 +111,35 @@ With all associated functions:
 >
 > -- We initialize the world state
 > -- then angle, position and zoom of the camera
-> -- the number of details
 > -- And the shape function
 > initialWorld :: World
 > initialWorld = World {
 >    angle = makePoint3D (0,0,0)
 >  , position = makePoint3D (0,0,0)
 >  , scale = 1
->  , details = makePoint3D (100,100,100)
 >  , shape = shapeFunc
 >  }
 > 
 > shapeFunc :: Function3D
 > shapeFunc x y = 
 >   let 
->       depth = zpoint (details initialWorld) -- WARNING DON'T LIKE THIS
+>       depth = 1
 >       z = findMaxOrdFor (ymandel x y) 0 depth (truncate $ log depth)
 >   in
->   if z == 0 
->       then Nothing 
->       else Just (z/64)
+>   Just z
+>   -- if z == 0 
+>   --     then Nothing 
+>   --     else Just z
 > 
 > 
-> findMaxOrdFor :: (Num a,Fractional a,Eq b,Num b) => (a -> b) -> a -> a -> Int -> a
-> findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
+> findMaxOrdFor :: (Fractional a,Num a,Num b,Eq b) => 
+>                  (a -> b) -> a -> a -> Int -> a
+> findMaxOrdFor _ minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
 >   if func medpoint /= 0 
 >        then findMaxOrdFor func minval medpoint (n-1)
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
 > 
-> ymandel x y z = mandel x y z 64
+> ymandel :: Point -> Point -> Point -> Point
+> ymandel x y z = fromIntegral (mandel x y z 64) / 64

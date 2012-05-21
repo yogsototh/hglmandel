@@ -20,10 +20,11 @@ module YGL (
     -- The main loop function to call
     , yMainLoop) where
 
+import Debug.Trace (trace)
+
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import Data.IORef
-import Data.Map ((!))
 import qualified Data.Map as Map
 import Control.Monad (when)
 import Data.Maybe (isNothing)
@@ -203,13 +204,16 @@ keyboardMouse input world key state _ _ =
          let 
             charFromKey (Char c) = c
             -- To replace
-            charFromKey (SpecialKey _) = '#'
-            charFromKey (MouseButton _) = '#'
+            charFromKey _ = '#'
 
-            transformator = input ! Press (charFromKey key)
-         in do
+            transformator = Map.lookup (Press (charFromKey key)) input 
+         in 
+         mayTransform transformator
+    where
+        mayTransform Nothing = return ()
+        mayTransform (Just transform) = do
             w <- get world
-            world $= transformator w
+            world $= transform w
 
 
 -- The function that will display datas
@@ -241,16 +245,15 @@ display worldRef = do
     rotate (zpoint (camDir cam)) $ Vector3 0.0 0.0 (1.0::GLfloat)
     -- Now that all transformation were made
     -- We create the object(s)
-    let 
-        objs = objects w
-    _ <- preservingMatrix $ mapM drawObject objs
+    _ <- preservingMatrix $ mapM drawObject (objects w)
     swapBuffers -- refresh screen
 
 -- drawObject :: (YObject obj) => obj -> IO()
 drawObject :: YObject -> IO()
-drawObject shape = 
+drawObject shape = do
   -- We will print Points (not triangles for example) 
-  renderPrimitive Triangles $ 
+  renderPrimitive Triangles $ do
+    color $ Color3 (1.0::Point) (0.4::Point) (0.3::Point)
     mapM_ drawPoint (triangles shape unityBox)
   where
     drawPoint p = vertex (toGLVertex3 p)
