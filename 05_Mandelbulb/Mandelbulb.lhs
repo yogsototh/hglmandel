@@ -38,20 +38,20 @@ The mapping between user input and actions.
 > import Mandel -- The 3D Mandelbrot maths
 
 > -- Centralize all user input interaction
-> inputActionMap :: InputMap
+> inputActionMap :: InputMap World
 > inputActionMap = inputMapFromList [
->      (Press 'k' , rotate X 30)
->     ,(Press 'i' , rotate X (-30))
->     ,(Press 'j' , rotate Y 30)
->     ,(Press 'l' , rotate Y (-30))
->     ,(Press 'o' , rotate Z 30)
->     ,(Press 'u' , rotate Z (-30))
->     ,(Press 'f' , translate X 0.05)
->     ,(Press 's' , translate X (-0.05))
->     ,(Press 'e' , translate Y 0.05)
->     ,(Press 'd' , translate Y (-0.05))
->     ,(Press '+' , zoom (1.10))
->     ,(Press '-' , zoom (0.9))
+>      (Press 'k' , rotate xdir 30)
+>     ,(Press 'i' , rotate xdir (-30))
+>     ,(Press 'j' , rotate ydir 30)
+>     ,(Press 'l' , rotate ydir (-30))
+>     ,(Press 'o' , rotate zdir 30)
+>     ,(Press 'u' , rotate zdir (-30))
+>     ,(Press 'f' , translate xdir 0.05)
+>     ,(Press 's' , translate xdir (-0.05))
+>     ,(Press 'e' , translate ydir 0.05)
+>     ,(Press 'd' , translate ydir (-0.05))
+>     ,(Press '+' , zoom 1.1)
+>     ,(Press '-' , zoom 0.9)
 >     ]
 
 The type of each couple should be of the form
@@ -63,39 +63,40 @@ And of course a type design the World State:
 > -- I prefer to set my own name for these types
 > data World = World {
 >       angle       :: Point3D
->     , zoom        :: Point1D
+>     , scale       :: Scalar
 >     , position    :: Point3D
 >     , details     :: Point3D
 >     , shape       :: Function3D
 >     } 
 
+> instance DisplayableWorld World where
+>   camera w = Camera {
+>         camPos = position w, 
+>         camDir = angle w,
+>         camZoom = scale w }
+
 With all associated functions:
 
-> X = (1,0,0) :: Point3D
-> Y = (0,1,0) :: Point3D
-> Z = (0,0,1) :: Point3D
+> xdir :: Point3D
+> xdir = makePoint3D (1,0,0)
+> ydir :: Point3D
+> ydir = makePoint3D (0,1,0)
+> zdir :: Point3D
+> zdir = makePoint3D (0,0,1)
 >
-> xproj (x,_,_) = x
-> yproj (_,y,_) = y
-> zproj (_,_,z) = z
-> 
 > rotate :: Point3D -> Scalar -> World -> World
-> rotate (a,b,c) angle world = world {
->     angle = angle world {
->           x = x (angle world) + a
->         , y = y (angle world) + b
->         , z = z (angle world) + c }}
+> rotate dir angleValue world = world {
+>                                   angle = angleValue -*< dir 
+>                               }
 > 
-> rotate :: Point3D -> Scalar -> World -> World
-> translate (a,b,c) len world = world {
->     position = position world {
->           x = x (position world) + a*len
->         , y = y (position world) + b*len
->         , z = z (position world) + c*len }}
+> translate :: Point3D -> Scalar -> World -> World
+> translate dir len world = world {
+>     position = position world -+< (len -*< dir)
+>   }
 > 
-> rotate :: Scalar -> World -> World
+> zoom :: Scalar -> World -> World
 > zoom z world = world {
->     zoom = z * (zoom world) }
+>     scale = z * scale world }
 
 - [`YBoiler.hs`](code/04_Mandelbulb/YBoiler.hs), the 3D rendering
 - [`Mandel`](code/04_Mandelbulb/Mandel.hs), the mandel function
@@ -106,30 +107,38 @@ With all associated functions:
 > --   the title of the window
 > --   a function from time to triangles
 > main :: IO ()
-> main = yMainLoop "3D Mandelbrot" inputActionMap world 
+> main = yMainLoop "3D Mandelbrot" inputActionMap initialWorld
 >
 > -- We initialize the world state
 > -- then angle, position and zoom of the camera
 > -- the number of details
 > -- And the shape function
-> world :: World
-> world = World {
->    angle = (0,0,0)
->  , positon = (0,0,0)
->  , zoom = 1
->  , details = (100,100,100)
->  , shape x y = 
->       let depth = zproj (world details)
->       findMaxOrdFor (ymandel x y) 0 depth (truncate $ log depth)
-> }
+> initialWorld :: World
+> initialWorld = World {
+>    angle = makePoint3D (0,0,0)
+>  , position = makePoint3D (0,0,0)
+>  , scale = 1
+>  , details = makePoint3D (100,100,100)
+>  , shape = shapeFunc
+>  }
+> 
+> shapeFunc :: Function3D
+> shapeFunc x y = 
+>   let 
+>       depth = zpoint (details initialWorld) -- WARNING DON'T LIKE THIS
+>       z = findMaxOrdFor (ymandel x y) 0 depth (truncate $ log depth)
+>   in
+>   if z == 0 
+>       then Nothing 
+>       else Just (z/64)
 > 
 > 
-> findMaxOrdFor :: (a -> b) -> a -> a -> Int -> a
+> findMaxOrdFor :: (Num a,Fractional a,Eq b,Num b) => (a -> b) -> a -> a -> Int -> a
 > findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
->   if (func medpoint) /= 0 
+>   if func medpoint /= 0 
 >        then findMaxOrdFor func minval medpoint (n-1)
 >        else findMaxOrdFor func medpoint maxval (n-1)
 >   where medpoint = (minval+maxval)/2
 > 
-> ymandel x y z = mandel (2*x/width) (2*y/height) (2*z/depth) 64
+> ymandel x y z = mandel x y z 64

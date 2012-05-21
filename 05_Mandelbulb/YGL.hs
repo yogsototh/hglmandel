@@ -1,21 +1,32 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module YGL (
-    Point
-    , DisplayableWorld
-    , Camera
-    , YObject
+    -- Datas
+    Point 
     , Scalar
-    , Point3D
+    , Point3D (Point3D,xpoint,ypoint,zpoint)
+    , makePoint3D -- helper (x,y,z) -> Point3D
+    , (-*<) -- scalar product on Point3D
+    , (-+<) -- add two Point3D
     , Function3D
-    , yMainLoop
+    -- Your world state must be an instance
+    -- of the DisplayableWorld type class
+    , DisplayableWorld (camera,lights,objects)
+    -- Datas related to DisplayableWorld
+    , Camera (Camera,camPos,camDir,camZoom)
+    , YObject (XYFunc, Tri)
+    -- Datas related to user Input
     , InputMap
-    , inputMapFromList) where
+    , UserInput (Press,Ctrl,Alt,CtrlAlt)
+    , inputMapFromList
+    -- The main loop function to call
+    , yMainLoop) where
 
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import Data.IORef
 import Data.Map ((!))
 import qualified Data.Map as Map
+import Control.Monad (when)
+import Data.Maybe (isNothing)
 
 {-- Things start to be complex here.
 - Just take the time to follow me.
@@ -34,8 +45,23 @@ data Point3D = Point3D {
     , ypoint :: Point
     , zpoint :: Point }
 
-makePoint3D :: (Scalar,Scalar,Scalar) -> Point3D
+makePoint3D :: (Point,Point,Point) -> Point3D
 makePoint3D (x,y,z) = Point3D {xpoint=x, ypoint=y, zpoint=z}
+
+
+infixr 5 -*<
+(-*<) :: Scalar -> Point3D -> Point3D
+(-*<) s p = Point3D {
+              xpoint=s*xpoint p,
+              ypoint=s*ypoint p,
+              zpoint=s*zpoint p}
+
+infixr 5 -+<
+(-+<) :: Point3D -> Point3D -> Point3D
+(-+<) p q = Point3D {
+              xpoint=xpoint p*xpoint q,
+              ypoint=ypoint p*ypoint q,
+              zpoint=zpoint p*zpoint q}
 
 toGLVector3 :: Point3D -> Vector3 GLfloat
 toGLVector3 p = Vector3 (xpoint p) (ypoint p) (zpoint p)
@@ -52,25 +78,19 @@ data Box3D = Box3D {
        , maxPoint :: Point3D
        , resolution :: Scalar }
 
-makeBox mini maxi resolution = Box3D {
+makeBox :: (Point,Point,Point) -> (Point,Point,Point) -> Scalar -> Box3D
+makeBox mini maxi res = Box3D {
       minPoint = makePoint3D mini
     , maxPoint = makePoint3D maxi
-    , resolution = resolution  }
+    , resolution = res  }
 
--- | We want to be able to create object with 
--- | many different ways.
--- | We then made a type class.
--- | A type is in the YObject class if we declare
--- | a function triangles which take this type
--- | and a bounded box, and return a list of triangles.
-class YObject objectType where
-    triangles :: objectType -> Box3D -> [Point3D]
-
--- | We declare Function3D as f(x,y) -> z
 type Function3D = Point -> Point -> Maybe Point
-instance YObject Function3D where
-    -- | The details of the code somewhere else
-    triangles = getObject3DFromShapeFunction
+data YObject =   XYFunc Function3D
+               | Tri [Point3D]
+
+triangles :: YObject -> Box3D -> [Point3D]
+triangles (XYFunc f) b = getObject3DFromShapeFunction f b
+triangles (Tri tri) _ = tri
 
 -- | We decalre the input map type we need here
 -- | It is our API
@@ -84,7 +104,7 @@ class DisplayableWorld world where
     camera _ = defaultCamera 
     lights :: world -> [Light]
     lights _ = []
-    objects :: (YObject obj) => world -> [obj]
+    objects :: world -> [YObject]
     objects _ = []
 
 -- | the Camera type to know how to
@@ -94,6 +114,7 @@ data Camera = Camera {
         , camDir  :: Point3D
         , camZoom :: Scalar }
 
+defaultCamera :: Camera
 defaultCamera = Camera {
       camPos = makePoint3D (0,0,0)
     , camDir = makePoint3D (0,0,0)
@@ -112,10 +133,10 @@ getObject3DFromShapeFunction shape box = do
     zs = map (\(u,v) -> (u,v,shape u v)) neighbors
     -- ps are 3D opengl points + color value
     removeMaybe (u,v,Just w) = (u,v,w)
-    removeMaybe (u,v,Nothing) = (0,0,0)
+    removeMaybe (_,_,Nothing) = (0,0,0)
     ps = map removeMaybe zs
   -- If the point diverged too fast, don't display it
-  if (and $ map (\(_,_,z) -> z==Nothing) zs)
+  if any (\(_,_,z) -> isNothing z) zs
   then []
   -- Draw two triangles
   --    3 - 2
@@ -127,16 +148,12 @@ getObject3DFromShapeFunction shape box = do
     -- easier to read
     xmin = xpoint $ minPoint box
     xmax = xpoint $ maxPoint box
-    width = xmax - xmin
     ymin = ypoint $ minPoint box
     ymax = ypoint $ maxPoint box
-    height = ymax - ymin
-    zmin = zpoint $ minPoint box
-    zmax = zpoint $ maxPoint box
-    depth = zmax - zmin
     res = resolution box
 
-inputMapFromList :: (DisplayableWorld world) => [(UserInput,world -> world)] -> InputMap world
+inputMapFromList :: (DisplayableWorld world) => 
+    [(UserInput,world -> world)] -> InputMap world
 inputMapFromList = Map.fromList
 
 {-- 
@@ -151,14 +168,14 @@ yMainLoop :: (DisplayableWorld worldType) =>
              -> InputMap worldType -- the mapping user input / world
              -> worldType -- the world state
              -> IO ()     -- into IO () for obvious reason
-yMainLoop windowTitle 
+yMainLoop winTitle 
           inputActionMap 
           world = do
   -- The boilerplate
-  (progname,_) <- getArgsAndInitialize
+  _ <- getArgsAndInitialize
   initialDisplayMode $= 
       [WithDepthBuffer,DoubleBuffered,RGBMode]
-  createWindow windowTitle
+  _ <- createWindow winTitle
   depthFunc  $= Just Less
   windowSize $= Size 500 500
   -- The state variables for the world (I know it feels BAD)
@@ -174,25 +191,30 @@ yMainLoop windowTitle
   mainLoop
 
 -- When no user input entered do nothing
+idle :: IO ()
 idle = postRedisplay Nothing
 
 -- Get User Input
 -- both cleaner, terser and more expendable than the preceeding code
-keyboardMouse :: InputMap a -> (IORef a) 
+keyboardMouse :: InputMap a -> IORef a
                  -> Key -> KeyState -> Modifiers -> Position -> IO()
-keyboardMouse input world key state modifiers position =
-    if state == Down
-    then
+keyboardMouse input world key state _ _ =
+    when (state == Down) $
          let 
             charFromKey (Char c) = c
-            transformator = input ! (Press (charFromKey key))
+            -- To replace
+            charFromKey (SpecialKey _) = '#'
+            charFromKey (MouseButton _) = '#'
+
+            transformator = input ! Press (charFromKey key)
          in do
             w <- get world
-            world $= (transformator w)
-    else return ()
+            world $= transformator w
 
 
 -- The function that will display datas
+display :: (HasGetter g, DisplayableWorld world) => 
+           g world -> IO ()
 display worldRef = do
     -- BEWARE UGLINESS!!!!
     -- SHOULD NEVER MODIFY worldRef HERE!!!!
@@ -219,18 +241,17 @@ display worldRef = do
     rotate (zpoint (camDir cam)) $ Vector3 0.0 0.0 (1.0::GLfloat)
     -- Now that all transformation were made
     -- We create the object(s)
-    t <- get elapsedTime
     let 
         objs = objects w
-    preservingMatrix $ mapM drawObject objs
+    _ <- preservingMatrix $ mapM drawObject objs
     swapBuffers -- refresh screen
 
 -- drawObject :: (YObject obj) => obj -> IO()
-drawObject :: Function3D -> IO()
-drawObject shape = do
+drawObject :: YObject -> IO()
+drawObject shape = 
   -- We will print Points (not triangles for example) 
-  renderPrimitive Triangles $ do
+  renderPrimitive Triangles $ 
     mapM_ drawPoint (triangles shape unityBox)
   where
     drawPoint p = vertex (toGLVertex3 p)
-    unityBox = makeBox ((-2),(-2),(-2)) (2,2,2) 0.2 
+    unityBox = makeBox (-2,-2,-2) (2,2,2) 0.2 
