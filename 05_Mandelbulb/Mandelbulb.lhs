@@ -30,7 +30,7 @@ Clearly, ideally we should provide only three parameters to this main loop funct
 
 - an initial World state
 - a mapping between the user interaction and function which modify the world
-- a function which transform the world without user interaction.
+- a function which transorm the world without user interaction.
 
 The mapping between user input and actions.
 
@@ -65,7 +65,7 @@ And of course a type design the World State:
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
->     , shape       :: Function3D
+>     , shape       :: YObject
 >     } 
 
 > instance DisplayableWorld World where
@@ -73,7 +73,7 @@ And of course a type design the World State:
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
->   objects w = [XYFunc (shape w)]
+>   objects w = [shape w]
 
 With all associated functions:
 
@@ -85,14 +85,14 @@ With all associated functions:
 > zdir = makePoint3D (0,0,1)
 >
 > rotate :: Point3D -> Scalar -> World -> World
-> rotate dir angleValue world = world {
->                                   angle = angleValue -*< dir
->                               }
+> rotate dir angleValue world = 
+>   world {
+>      angle = (angle world) + (angleValue -*< dir) }
 > 
 > translate :: Point3D -> Scalar -> World -> World
-> translate dir len world = world {
->     position = position world -+< (len -*< dir)
->   }
+> translate dir len world = 
+>   world {
+>     position = (position world) + (len -*< dir) }
 > 
 > zoom :: Scalar -> World -> World
 > zoom z world = world {
@@ -114,19 +114,18 @@ With all associated functions:
 > -- And the shape function
 > initialWorld :: World
 > initialWorld = World {
->    angle = makePoint3D (0,0,0)
+>    angle = makePoint3D (0,1,0)
 >  , position = makePoint3D (0,0,0)
->  , scale = 1
->  , shape = shapeFunc
+>  , scale = 0.2
+>  , shape = XYSymFunc shapeFunc
 >  }
 > 
 > shapeFunc :: Function3D
 > shapeFunc x y = 
 >   let 
->       depth = 1
->       z = findMaxOrdFor (ymandel x y) 0 depth (truncate $ log depth)
+>       z = findMaxOrdFor (ymandel x y) 0 1 20
 >   in
->   if z == 0 
+>   if z < 0.000001
 >       then Nothing 
 >       else Just z
 > 

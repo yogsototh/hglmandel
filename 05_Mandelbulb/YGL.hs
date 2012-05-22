@@ -5,14 +5,13 @@ module YGL (
     , Point3D (Point3D,xpoint,ypoint,zpoint)
     , makePoint3D -- helper (x,y,z) -> Point3D
     , (-*<) -- scalar product on Point3D
-    , (-+<) -- add two Point3D
     , Function3D
     -- Your world state must be an instance
     -- of the DisplayableWorld type class
     , DisplayableWorld (camera,lights,objects)
     -- Datas related to DisplayableWorld
     , Camera (Camera,camPos,camDir,camZoom)
-    , YObject (XYFunc, Tri)
+    , YObject (XYFunc, XYSymFunc, Tri)
     -- Datas related to user Input
     , InputMap
     , UserInput (Press,Ctrl,Alt,CtrlAlt)
@@ -20,8 +19,7 @@ module YGL (
     -- The main loop function to call
     , yMainLoop) where
 
-import Debug.Trace (trace)
-
+import Numeric (readHex)
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import Data.IORef
@@ -44,7 +42,7 @@ type Scalar  = GLfloat
 data Point3D = Point3D { 
       xpoint :: Point
     , ypoint :: Point
-    , zpoint :: Point }
+    , zpoint :: Point } deriving (Show,Read)
 
 makePoint3D :: (Point,Point,Point) -> Point3D
 makePoint3D (x,y,z) = Point3D {xpoint=x, ypoint=y, zpoint=z}
@@ -56,19 +54,43 @@ infixr 5 -*<
               xpoint=s*xpoint p,
               ypoint=s*ypoint p,
               zpoint=s*zpoint p}
-
-infixr 5 -+<
-(-+<) :: Point3D -> Point3D -> Point3D
-(-+<) p q = Point3D {
-              xpoint=xpoint p*xpoint q,
-              ypoint=ypoint p*ypoint q,
-              zpoint=zpoint p*zpoint q}
+instance Num Point3D where
+    (+) p q = Point3D {
+                xpoint=xpoint p + xpoint q,
+                ypoint=ypoint p + ypoint q,
+                zpoint=zpoint p + zpoint q}
+    (-) p q = Point3D {
+                xpoint=xpoint p - xpoint q,
+                ypoint=ypoint p - ypoint q,
+                zpoint=zpoint p - zpoint q}
+    (*) p q = Point3D {
+                xpoint = ay*bz - az*by
+              , ypoint = az*bx - ax*bz
+              , zpoint = ax*by - ay*bx }
+              where
+                  ax = xpoint p
+                  ay = ypoint p
+                  az = zpoint p
+                  bx = xpoint q
+                  by = ypoint q
+                  bz = zpoint q
+    abs p = Point3D { 
+                 xpoint = abs $ xpoint p
+                ,ypoint = abs $ ypoint p
+                ,zpoint = abs $ zpoint p }
+    fromInteger i = Point3D { 
+                 xpoint = fromInteger i
+                ,ypoint = 0
+                ,zpoint = 0 }
 
 toGLVector3 :: Point3D -> Vector3 GLfloat
 toGLVector3 p = Vector3 (xpoint p) (ypoint p) (zpoint p)
 
 toGLVertex3 :: Point3D -> Vertex3 GLfloat
 toGLVertex3 p = Vertex3 (xpoint p) (ypoint p) (zpoint p)
+
+toGLNormal3 :: Point3D -> Normal3 GLfloat
+toGLNormal3 p = Normal3 (xpoint p) (ypoint p) (zpoint p)
 
 -- | The Box3D type represent a 3D bounding box
 -- | Note if minPoint = (x,y,z) and maxPoint = (x',y',z')
@@ -87,10 +109,13 @@ makeBox mini maxi res = Box3D {
 
 type Function3D = Point -> Point -> Maybe Point
 data YObject =   XYFunc Function3D
+               | XYSymFunc Function3D
                | Tri [Point3D]
 
 triangles :: YObject -> Box3D -> [Point3D]
 triangles (XYFunc f) b = getObject3DFromShapeFunction f b
+triangles (XYSymFunc f) b = tris ++ ( reverse $ map (\p -> p { zpoint = - zpoint p}) tris )
+                        where tris = getObject3DFromShapeFunction f b
 triangles (Tri tri) _ = tri
 
 -- | We decalre the input map type we need here
@@ -129,7 +154,7 @@ getObject3DFromShapeFunction shape box = do
   x <- [xmin,xmin+res..xmax]
   y <- [ymin,ymin+res..ymax]
   let 
-    neighbors = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
+    neighbors = [(x,y),(x+res,y),(x+res,y+res),(x,y+res)]
     -- zs are 3D points with found depth
     zs = map (\(u,v) -> (u,v,shape u v)) neighbors
     -- ps are 3D opengl points + color value
@@ -143,7 +168,8 @@ getObject3DFromShapeFunction shape box = do
   --    3 - 2
   --    | / |
   --    0 - 1
-  else map makePoint3D [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
+  -- The order is important
+  else map makePoint3D [ps!!0,ps!!2,ps!!1,ps!!0,ps!!3,ps!!2]
   where
     -- some naming to make it 
     -- easier to read
@@ -188,6 +214,16 @@ yMainLoop winTitle
           Just (keyboardMouse inputActionMap worldRef)
   -- We generate one frame using the callback
   displayCallback $= display worldRef
+  -- Lights
+  lighting $= Enabled
+  ambient (Light 0) $= Color4 0.7 0.6 0.3 1
+  diffuse (Light 0) $= Color4 1 1 1 1
+  position (Light 0) $= Vertex4 0.5 0.5 0.3 1
+  light (Light 0) $= Enabled
+  ambient (Light 1) $= Color4 0.7 0.6 0.3 1
+  diffuse (Light 1) $= Color4 1 1 1 1
+  position (Light 1) $= Vertex4 (-0.5) (-0.5) (-0.3) 1
+  light (Light 1) $= Enabled
   -- We enter the main loop
   mainLoop
 
@@ -248,13 +284,51 @@ display worldRef = do
     _ <- preservingMatrix $ mapM drawObject (objects w)
     swapBuffers -- refresh screen
 
+-- Hexa style colors
+scalarFromHex :: String -> Scalar
+scalarFromHex = (/256) . fst . head . readHex 
+
+hexColor :: [Char] -> Color3 Scalar
+hexColor ('#':rd:ru:gd:gu:bd:bu:[]) = Color3 (scalarFromHex (rd:ru:[]))
+                                             (scalarFromHex (gd:gu:[])) 
+                                             (scalarFromHex (bd:bu:[]))
+hexColor ('#':r:g:b:[]) = hexColor ('#':r:r:g:g:b:b:[])
+hexColor _ = error "Bad color!!!!"
+---
+
 -- drawObject :: (YObject obj) => obj -> IO()
 drawObject :: YObject -> IO()
 drawObject shape = do
   -- We will print Points (not triangles for example) 
   renderPrimitive Triangles $ do
-    color $ Color3 (1.0::Point) (0.4::Point) (0.3::Point)
-    mapM_ drawPoint (triangles shape unityBox)
+    -- solarized base3 color
+    -- color $ Color3 (0.988::Point) (0.96::Point) (0.886::Point)
+    color $ hexColor "#fdf6e3" 
+    drawTriangles (triangles shape unityBox)
   where
-    drawPoint p = vertex (toGLVertex3 p)
-    unityBox = makeBox (-2,-2,-2) (2,2,2) 0.2 
+    drawTriangles tri@(p0:p1:p2:points) = do
+        normal $ toGLNormal3 trinorm
+        vertex $ toGLVertex3 p0
+        vertex $ toGLVertex3 p1
+        vertex $ toGLVertex3 p2
+        drawTriangles points
+        where 
+            trinorm = (getNormal tri)
+    drawTriangles _ = return ()
+    unityBox = makeBox (-2,-2,-2) (2,2,2) 0.05
+
+getNormal (p0:p1:p2:points) = (p1 - p0) * (p2 - p0)
+getNormal _ = makePoint3D (0,0,1)
+
+cross :: Point3D -> Point3D -> Point3D
+cross p q = Point3D {
+      xpoint = ay*bz - az*by
+    , ypoint = az*bx - ax*bz
+    , zpoint = ax*by - ay*bx }
+    where
+        ax = xpoint p
+        ay = ypoint p
+        az = zpoint p
+        bx = xpoint q
+        by = ypoint q
+        bz = zpoint q
