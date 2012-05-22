@@ -51,7 +51,9 @@ The mapping between user input and actions.
 >     ,(Press 'e' , translate ydir 0.1)
 >     ,(Press 'd' , translate ydir (-0.1))
 >     ,(Press '+' , zoom 1.1)
->     ,(Press '-' , zoom 0.9)
+>     ,(Press '-' , zoom (1/1.1))
+>     ,(Press 'r' , resize 1.2)
+>     ,(Press 'z' , resize (1/1.2))
 >     ]
 
 The type of each couple should be of the form
@@ -65,7 +67,8 @@ And of course a type design the World State:
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
->     , shape       :: YObject
+>     , shape       :: Function3D
+>     , box         :: Box3D
 >     } 
 
 > instance DisplayableWorld World where
@@ -73,7 +76,7 @@ And of course a type design the World State:
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
->   objects w = [shape w]
+>   objects w = [XYFunc (shape w) (box w)]
 
 With all associated functions:
 
@@ -97,6 +100,11 @@ With all associated functions:
 > zoom :: Scalar -> World -> World
 > zoom z world = world {
 >     scale = z * scale world }
+> 
+> resize :: Scalar -> World -> World
+> resize r world = world {
+>     box = (box world) {
+>      resolution = (resolution (box world)) * r }}
 
 - [`YBoiler.hs`](code/04_Mandelbulb/YBoiler.hs), the 3D rendering
 - [`Mandel`](code/04_Mandelbulb/Mandel.hs), the mandel function
@@ -117,7 +125,10 @@ With all associated functions:
 >    angle = makePoint3D (0,1,0)
 >  , position = makePoint3D (0,0,0)
 >  , scale = 0.2
->  , shape = XYSymFunc shapeFunc
+>  , shape = shapeFunc 
+>  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
+>                , maxPoint =  makePoint3D (2,2,2)
+>                , resolution =  0.2 }
 >  }
 > 
 > shapeFunc :: Function3D

@@ -24,6 +24,7 @@ module YGL (
     -- Datas related to DisplayableWorld
     , Camera (Camera,camPos,camDir,camZoom)
     , YObject (XYFunc, XYSymFunc, Tri)
+    , Box3D (Box3D, minPoint, maxPoint, resolution)
     -- Datas related to user Input
     , InputMap
     , UserInput (Press,Ctrl,Alt,CtrlAlt)
@@ -101,15 +102,16 @@ makeBox mini maxi res = Box3D {
     , resolution = res  }
 
 type Function3D = Point -> Point -> Maybe Point
-data YObject =   XYFunc Function3D
-               | XYSymFunc Function3D
+data YObject =   XYFunc Function3D Box3D
+               | XYSymFunc Function3D Box3D
                | Tri [Point3D]
 
-triangles :: YObject -> Box3D -> [Point3D]
-triangles (XYFunc f) b = getObject3DFromShapeFunction f b
-triangles (XYSymFunc f) b = tris ++ ( reverse $ map (\(P(x,y,z)) -> P (x,y,-z)) tris )
-                        where tris = getObject3DFromShapeFunction f b
-triangles (Tri tri) _ = tri
+triangles :: YObject -> [Point3D]
+triangles (XYFunc f b) = getObject3DFromShapeFunction f b
+triangles (XYSymFunc f b) = tris ++ 
+    ( reverse $ map (\(P(x,y,z)) -> P (x,y,-z)) tris )
+    where tris = getObject3DFromShapeFunction f b
+triangles (Tri tri) = tri
 
 -- | We decalre the input map type we need here
 -- | It is our API
@@ -297,7 +299,7 @@ drawObject shape = do
     -- solarized base3 color
     -- color $ Color3 (0.988::Point) (0.96::Point) (0.886::Point)
     color $ hexColor "#fdf6e3" 
-    drawTriangles (triangles shape unityBox)
+    drawTriangles (triangles shape)
   where
     drawTriangles tri@(p0:p1:p2:points) = do
         normal $ toGLNormal3 trinorm
