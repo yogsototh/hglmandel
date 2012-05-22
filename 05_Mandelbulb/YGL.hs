@@ -1,8 +1,20 @@
+-- The languages include needed because I wanted to use
+-- (Point,Point,Point) instead of 
+-- data Point3D = Point3D (Point,Point,Point) deriving ...
+{-
+The module YGL will contains most boilerplate
+And display details.
+
+To make things even nicer, we should separate
+this file in many different parts.
+Typically separate the display function.
+
+-}
 module YGL (
     -- Datas
     Point 
     , Scalar
-    , Point3D (Point3D,xpoint,ypoint,zpoint)
+    , Point3D
     , makePoint3D -- helper (x,y,z) -> Point3D
     , (-*<) -- scalar product on Point3D
     , Function3D
@@ -31,66 +43,47 @@ import Data.Maybe (isNothing)
 - Just take the time to follow me.
 --}
 
-{-- A lot of declaration that I find helpful,
-- I don't like default naming convention --}
-
 -- | A 1D point
 type Point   = GLfloat 
 -- | A Scalar value
 type Scalar  = GLfloat
 -- | A 3D Point mainly '(x,y,z)'
-data Point3D = Point3D { 
-      xpoint :: Point
-    , ypoint :: Point
-    , zpoint :: Point } deriving (Show,Read)
+data Point3D = P (Point,Point,Point) deriving (Eq,Show,Read)
+
+xpoint :: Point3D -> Point
+xpoint (P (x,_,_)) = x
+ypoint :: Point3D -> Point
+ypoint (P (_,y,_)) = y
+zpoint :: Point3D -> Point
+zpoint (P (_,_,z)) = z
 
 makePoint3D :: (Point,Point,Point) -> Point3D
-makePoint3D (x,y,z) = Point3D {xpoint=x, ypoint=y, zpoint=z}
+makePoint3D p = P p
 
+
+instance Num Point3D where
+    (+) (P (ax,ay,az)) (P (bx,by,bz)) = P (ax+bx,ay+by,az+bz)
+    (-) (P (ax,ay,az)) (P (bx,by,bz)) = P (ax-bx,ay-by,az-bz)
+    (*) (P (ax,ay,az)) (P (bx,by,bz)) = P ( ay*bz - az*by
+                                , az*bx - ax*bz
+                                , ax*by - ay*bx )
+    abs (P (x,y,z)) = P (abs x,abs y, abs z)
+    signum (P (x,y,z)) = P (signum x, signum y, signum z)
+    fromInteger i = P (fromInteger i, 0, 0)
 
 infixr 5 -*<
 (-*<) :: Scalar -> Point3D -> Point3D
-(-*<) s p = Point3D {
-              xpoint=s*xpoint p,
-              ypoint=s*ypoint p,
-              zpoint=s*zpoint p}
-instance Num Point3D where
-    (+) p q = Point3D {
-                xpoint=xpoint p + xpoint q,
-                ypoint=ypoint p + ypoint q,
-                zpoint=zpoint p + zpoint q}
-    (-) p q = Point3D {
-                xpoint=xpoint p - xpoint q,
-                ypoint=ypoint p - ypoint q,
-                zpoint=zpoint p - zpoint q}
-    (*) p q = Point3D {
-                xpoint = ay*bz - az*by
-              , ypoint = az*bx - ax*bz
-              , zpoint = ax*by - ay*bx }
-              where
-                  ax = xpoint p
-                  ay = ypoint p
-                  az = zpoint p
-                  bx = xpoint q
-                  by = ypoint q
-                  bz = zpoint q
-    abs p = Point3D { 
-                 xpoint = abs $ xpoint p
-                ,ypoint = abs $ ypoint p
-                ,zpoint = abs $ zpoint p }
-    fromInteger i = Point3D { 
-                 xpoint = fromInteger i
-                ,ypoint = 0
-                ,zpoint = 0 }
+(-*<) s p = P (s*xpoint p, s*ypoint p, s*zpoint p)
+
 
 toGLVector3 :: Point3D -> Vector3 GLfloat
-toGLVector3 p = Vector3 (xpoint p) (ypoint p) (zpoint p)
+toGLVector3 (P(x,y,z)) = Vector3 x y z
 
 toGLVertex3 :: Point3D -> Vertex3 GLfloat
-toGLVertex3 p = Vertex3 (xpoint p) (ypoint p) (zpoint p)
+toGLVertex3 (P(x,y,z)) = Vertex3 x y z
 
 toGLNormal3 :: Point3D -> Normal3 GLfloat
-toGLNormal3 p = Normal3 (xpoint p) (ypoint p) (zpoint p)
+toGLNormal3 (P(x,y,z)) = Normal3 x y z
 
 -- | The Box3D type represent a 3D bounding box
 -- | Note if minPoint = (x,y,z) and maxPoint = (x',y',z')
@@ -114,7 +107,7 @@ data YObject =   XYFunc Function3D
 
 triangles :: YObject -> Box3D -> [Point3D]
 triangles (XYFunc f) b = getObject3DFromShapeFunction f b
-triangles (XYSymFunc f) b = tris ++ ( reverse $ map (\p -> p { zpoint = - zpoint p}) tris )
+triangles (XYSymFunc f) b = tris ++ ( reverse $ map (\(P(x,y,z)) -> P (x,y,-z)) tris )
                         where tris = getObject3DFromShapeFunction f b
 triangles (Tri tri) _ = tri
 
@@ -317,18 +310,6 @@ drawObject shape = do
     drawTriangles _ = return ()
     unityBox = makeBox (-2,-2,-2) (2,2,2) 0.05
 
-getNormal (p0:p1:p2:points) = (p1 - p0) * (p2 - p0)
+getNormal :: [Point3D] -> Point3D
+getNormal (p0:p1:p2:_) = (p1 - p0) * (p2 - p0)
 getNormal _ = makePoint3D (0,0,1)
-
-cross :: Point3D -> Point3D -> Point3D
-cross p q = Point3D {
-      xpoint = ay*bz - az*by
-    , ypoint = az*bx - ax*bz
-    , zpoint = ax*by - ay*bx }
-    where
-        ax = xpoint p
-        ay = ypoint p
-        az = zpoint p
-        bx = xpoint q
-        by = ypoint q
-        bz = zpoint q
