@@ -20,11 +20,11 @@ module YGL (
     , Function3D
     -- Your world state must be an instance
     -- of the DisplayableWorld type class
-    , DisplayableWorld (camera,lights,objects)
+    , DisplayableWorld (..)
     -- Datas related to DisplayableWorld
-    , Camera (Camera,camPos,camDir,camZoom)
-    , YObject (XYFunc, XYSymFunc, Tri)
-    , Box3D (Box3D, minPoint, maxPoint, resolution)
+    , Camera (..)
+    , YObject (..)
+    , Box3D (..)
     -- Datas related to user Input
     , InputMap
     , UserInput (Press,Ctrl,Alt,CtrlAlt)
