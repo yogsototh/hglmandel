@@ -40,16 +40,16 @@ The mapping between user input and actions.
 > -- Centralize all user input interaction
 > inputActionMap :: InputMap World
 > inputActionMap = inputMapFromList [
->      (Press 'k' , rotate xdir 30)
->     ,(Press 'i' , rotate xdir (-30))
->     ,(Press 'j' , rotate ydir 30)
->     ,(Press 'l' , rotate ydir (-30))
->     ,(Press 'o' , rotate zdir 30)
->     ,(Press 'u' , rotate zdir (-30))
->     ,(Press 'f' , translate xdir 0.05)
->     ,(Press 's' , translate xdir (-0.05))
->     ,(Press 'e' , translate ydir 0.05)
->     ,(Press 'd' , translate ydir (-0.05))
+>      (Press 'k' , rotate xdir 5)
+>     ,(Press 'i' , rotate xdir (-5))
+>     ,(Press 'j' , rotate ydir 5)
+>     ,(Press 'l' , rotate ydir (-5))
+>     ,(Press 'o' , rotate zdir 5)
+>     ,(Press 'u' , rotate zdir (-5))
+>     ,(Press 'f' , translate xdir 0.1)
+>     ,(Press 's' , translate xdir (-0.1))
+>     ,(Press 'e' , translate ydir 0.1)
+>     ,(Press 'd' , translate ydir (-0.1))
 >     ,(Press '+' , zoom 1.1)
 >     ,(Press '-' , zoom 0.9)
 >     ]
@@ -86,7 +86,7 @@ With all associated functions:
 >
 > rotate :: Point3D -> Scalar -> World -> World
 > rotate dir angleValue world = world {
->                                   angle = angleValue -*< dir 
+>                                   angle = angleValue -*< dir
 >                               }
 > 
 > translate :: Point3D -> Scalar -> World -> World
@@ -126,10 +126,9 @@ With all associated functions:
 >       depth = 1
 >       z = findMaxOrdFor (ymandel x y) 0 depth (truncate $ log depth)
 >   in
->   Just z
->   -- if z == 0 
->   --     then Nothing 
->   --     else Just z
+>   if z == 0 
+>       then Nothing 
+>       else Just z
 > 
 > 
 > findMaxOrdFor :: (Fractional a,Num a,Num b,Eq b) => 
