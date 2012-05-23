@@ -84,7 +84,7 @@ is to make our type an instance of the type class `DisplayableWorld`.
 We simply have to provide the definition of some functions.
 
 > instance DisplayableWorld World where
->   winTitle = "The YGL Mandelbulb"
+>   winTitle _ = "The YGL Mandelbulb"
 >   camera w = Camera {
 >         camPos = position w, 
 >         camDir = angle w,
