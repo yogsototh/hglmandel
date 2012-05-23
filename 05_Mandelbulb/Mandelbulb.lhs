@@ -152,13 +152,13 @@ Here is our initial world state.
 > -- And the shape function
 > initialWorld :: World
 > initialWorld = World {
->    angle = makePoint3D (-30,0,0)
+>    angle = makePoint3D (-30,-30,0)
 >  , position = makePoint3D (0,0,0)
 >  , scale = 0.8
 >  , shape = shapeFunc 
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
->                , resolution =  0.2 }
+>                , resolution =  0.16 }
 >  , told = 0
 >  }
 

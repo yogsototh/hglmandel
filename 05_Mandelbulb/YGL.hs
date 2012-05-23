@@ -217,10 +217,17 @@ yMainLoop inputActionMap
   displayCallback $= display worldRef
   -- Lights
   lighting $= Enabled
-  ambient (Light 1) $= Color4 0.99 0.98 0.62 1
-  diffuse (Light 1) $= Color4 0.99 0.98 0.62 1
-  position (Light 1) $= Vertex4 0 0 1 0.1
-  light (Light 1) $= Enabled
+  ambient (Light 0) $= Color4 0 0 0 1
+  diffuse (Light 0) $= Color4 1 1 1 1
+  specular (Light 0) $= Color4 1 1 1 1
+  position (Light 0) $= Vertex4 1 1 0 1
+  light (Light 0) $= Enabled
+  colorMaterial $= Just (Front,AmbientAndDiffuse)
+  materialDiffuse Front $= Color4 0.5 0.5 0.5 1 
+  materialAmbient Front $= Color4 0.5 0.5 0.5 1 
+  materialSpecular Front $= Color4 0.2 0.2 0.2 1 
+  materialEmission Front $= Color4 0.3 0.3 0.3 1
+  materialShininess Front $= 50.0
   -- We enter the main loop
   mainLoop
 
