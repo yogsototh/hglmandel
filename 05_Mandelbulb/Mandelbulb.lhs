@@ -8,11 +8,11 @@ Some points:
    Could we make this better?
    We will have two choices, or create our own `mainLoop` function to make it more functional.
    Or deal with the imperative nature of the GLUT `mainLoop` function.
-   As a goal of this article is to understand how to deal with existing library and particularly the one coming from impertive language we will continue to use the `mainLoop` function.
+   As a goal of this article is to understand how to deal with existing library and particularly the one coming from imperative language we will continue to use the `mainLoop` function.
 2. Or main problem come from user interaction.
    If you ask the Internet, about how to deal with user interaction with a functional paradigm, the main answer is to use _functional reactive programming_ (FRP).
    I read very few about FRP, and I might be completely wrong when I say that it is about creating a DSL where atoms are time functions.
-   While I'm writting these lines, I don't know if I'll do something looking close to that.
+   While I'm writing these lines, I don't know if I'll do something looking close to that.
    For now I'll simply try to resolve the first problem.
 
 Then here is how I imagine things should go.
@@ -30,12 +30,19 @@ Clearly, ideally we should provide only three parameters to this main loop funct
 
 - an initial World state
 - a mapping between the user interaction and function which modify the world
-- a function which transorm the world without user interaction.
+- a function taking two parameters: time and world state and render a new world without user interaction.
 
-The mapping between user input and actions.
+Here is a real working code, I've hidden most display functions.
+The YGL, is a kind of framework to display 3D functions.
+But it can easily be extended to many kind of representation.
 
 > import YGL -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
+
+We first set the mapping between user input and actions.
+The type of each couple should be of the form
+`(user input, f)` where (in a first time) `f:World -> World`.
+It means, the user input will transform the world state.
 
 > -- Centralize all user input interaction
 > inputActionMap :: InputMap World
@@ -58,11 +65,9 @@ The mapping between user input and actions.
 >     ,(Press 'g' , resize (1/1.2))
 >     ]
 
-The type of each couple should be of the form
-`(user input, f)` where (in a first time) `f:World -> World`.
-It means, the user input will transform the world state.
-
-And of course a type design the World State:
+And of course a type design the World State. 
+The important part is that it is our World State type.
+We could have used any kind of data type.
 
 > -- I prefer to set my own name for these types
 > data World = World {
@@ -71,9 +76,15 @@ And of course a type design the World State:
 >     , position    :: Point3D
 >     , shape       :: Scalar -> Function3D
 >     , box         :: Box3D
+>     , told        :: Time -- last frame time
 >     } 
 
+The important part to glue our own type to the framework
+is to make our type an instance of the type class `DisplayableWorld`.
+We simply have to provide the definition of some functions.
+
 > instance DisplayableWorld World where
+>   winTitle = "The YGL Mandelbulb"
 >   camera w = Camera {
 >         camPos = position w, 
 >         camDir = angle w,
@@ -83,7 +94,14 @@ And of course a type design the World State:
 >                   res = resolution $ box w
 >                   defbox = box w
 
-With all associated functions:
+The `camera` function will retrieve an object of type `Camera` which contains
+most necessary information to set our camera.
+The `objects` function will returns a list of objects. 
+Their type is `YObject`. Note the generation of triangles is no more in this file.
+Until here we only used declarative pattern.
+
+We also need to set all our transformation functions.
+These function are used to update the world state.
 
 > xdir :: Point3D
 > xdir = makePoint3D (1,0,0)
@@ -91,7 +109,10 @@ With all associated functions:
 > ydir = makePoint3D (0,1,0)
 > zdir :: Point3D
 > zdir = makePoint3D (0,0,1)
->
+
+Note `(-*<)` is scalar product.
+Also note we could add Point3D as numbers. 
+
 > rotate :: Point3D -> Scalar -> World -> World
 > rotate dir angleValue world = 
 >   world {
@@ -111,17 +132,21 @@ With all associated functions:
 >     box = (box world) {
 >      resolution = sqrt ((resolution (box world))**2 * r) }}
 
-- [`YBoiler.hs`](code/04_Mandelbulb/YBoiler.hs), the 3D rendering
-- [`Mandel`](code/04_Mandelbulb/Mandel.hs), the mandel function
-- [`ExtComplex`](code/04_Mandelbulb/ExtComplex.hs), the extended complexes
+The resize is used to generate the 3D function.
+As I wanted the time spent to generate a more detailed view 
+to grow linearly I use this not so straightforward formula.
 
-> 
-> -- yMainLoop takes two arguments
-> --   the title of the window
-> --   a function from time to triangles
+The `yMainLoop` takes three arguments.
+
+- A map between user Input and world transformation
+- A timed world transformation
+- An initial world state
+
 > main :: IO ()
-> main = yMainLoop "3D Mandelbrot" inputActionMap initialWorld
->
+> main = yMainLoop inputActionMap idleAction initialWorld
+
+Here is our initial world state.
+
 > -- We initialize the world state
 > -- then angle, position and zoom of the camera
 > -- And the shape function
@@ -134,8 +159,32 @@ With all associated functions:
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
 >                , resolution =  0.2 }
+>  , told = 0
 >  }
-> 
+
+We will define `shapeFunc` later.
+Here is the function which transform the world even without user action.
+Mainly it makes some rotation.
+
+> idleAction :: Time -> World -> World
+> idleAction tnew world = world {
+>     angle = (angle world) + (delta -*< zdir)
+>   , told = tnew
+>   }
+>   where 
+>       anglePerSec = 5.0
+>       delta = anglePerSec * elapsed / 1000.0
+>       elapsed = fromIntegral (tnew - (told world))
+
+Now the function which will generate points in 3D.
+The first parameter (`res`) is the resolution of the vertex generation.
+More precisely, `res` is distance between two points on one direction.
+We need it to "close" our shape.
+
+The type `Function3D` is `Point -> Point -> Maybe Point`.
+Because we consider partial functions
+(for some `(x,y)` our function can be undefined).
+
 > shapeFunc :: Scalar -> Function3D
 > shapeFunc res x y = 
 >   let 
@@ -145,8 +194,9 @@ With all associated functions:
 >               val <- [res], xeps <- [-val,val], yeps<-[-val,val]]
 >       then Nothing 
 >       else Just z
-> 
-> 
+
+The rest is similar to the preceding sections.
+
 > findMaxOrdFor :: (Fractional a,Num a,Num b,Eq b) => 
 >                  (a -> b) -> a -> a -> Int -> a
 > findMaxOrdFor _ minval maxval 0 = (minval+maxval)/2
@@ -158,3 +208,11 @@ With all associated functions:
 > 
 > ymandel :: Point -> Point -> Point -> Point
 > ymandel x y z = fromIntegral (mandel x y z 64) / 64
+
+I won't put how the magic occurs directly here.
+But all the magic occurs in the file `YGL.hs`.
+This file is commented a lot.
+
+- [`YGL.hs`](code/05_Mandelbulb/YGL.hs), the 3D rendering framework
+- [`Mandel`](code/05_Mandelbulb/Mandel.hs), the mandel function
+- [`ExtComplex`](code/05_Mandelbulb/ExtComplex.hs), the extended complexes

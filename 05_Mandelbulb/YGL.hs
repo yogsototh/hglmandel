@@ -13,6 +13,7 @@ Typically separate the display function.
 module YGL (
     -- Datas
     Point 
+    , Time
     , Scalar
     , Point3D
     , makePoint3D -- helper (x,y,z) -> Point3D
@@ -25,6 +26,7 @@ module YGL (
     , Camera (..)
     , YObject (..)
     , Box3D (..)
+    , makeBox
     -- Datas related to user Input
     , InputMap
     , UserInput (Press,Ctrl,Alt,CtrlAlt)
@@ -48,6 +50,8 @@ import Data.Maybe (isNothing)
 type Point   = GLfloat 
 -- | A Scalar value
 type Scalar  = GLfloat
+-- | The time type (currently its Int
+type Time = Int
 -- | A 3D Point mainly '(x,y,z)'
 data Point3D = P (Point,Point,Point) deriving (Eq,Show,Read)
 
@@ -127,6 +131,8 @@ class DisplayableWorld world where
     lights _ = []
     objects :: world -> [YObject]
     objects _ = []
+    winTitle :: world -> String
+    winTitle _ = "YGL"
 
 -- | the Camera type to know how to
 -- | Transform the scene to see the right view.
@@ -186,24 +192,24 @@ inputMapFromList = Map.fromList
 - it will look like a standard function.
 --}
 yMainLoop :: (DisplayableWorld worldType) =>
-             String       -- window name
-             -> InputMap worldType -- the mapping user input / world
+             InputMap worldType -- the mapping user input / world
+             -> (Time -> worldType -> worldType)
              -> worldType -- the world state
              -> IO ()     -- into IO () for obvious reason
-yMainLoop winTitle 
-          inputActionMap 
+yMainLoop inputActionMap 
+          worldTranformer
           world = do
   -- The boilerplate
   _ <- getArgsAndInitialize
   initialDisplayMode $= 
       [WithDepthBuffer,DoubleBuffered,RGBMode]
-  _ <- createWindow winTitle
+  _ <- createWindow $ winTitle world
   depthFunc  $= Just Less
   windowSize $= Size 500 500
   -- The state variables for the world (I know it feels BAD)
   worldRef <- newIORef world
   -- Action to call when waiting
-  idleCallback $= Just idle
+  idleCallback $= Just (idle worldTranformer worldRef)
   -- the keyboard will update the world
   keyboardMouseCallback $= 
           Just (keyboardMouse inputActionMap worldRef)
@@ -219,8 +225,12 @@ yMainLoop winTitle
   mainLoop
 
 -- When no user input entered do nothing
-idle :: IO ()
-idle = postRedisplay Nothing
+idle :: (Time -> worldType -> worldType) -> IORef worldType -> IO ()
+idle worldTranformer world = do
+    w <- get world
+    t <- get elapsedTime
+    world $= worldTranformer t w
+    postRedisplay Nothing
 
 -- Get User Input
 -- both cleaner, terser and more expendable than the preceeding code
