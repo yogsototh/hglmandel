@@ -106,6 +106,7 @@ To find the smallest number such that mandel x y > 0 we create a simple dichotom
 >   where medpoint = (minval+maxval)/2
 
 No rocket science here.
+I know, due to the fact the mandelbrot set is not convex this approach does some errors. But the approximation will be good enough.
 See the result now:
 
 blogimage("HGLMandelEdges.png","The edges of the mandelbrot set")
