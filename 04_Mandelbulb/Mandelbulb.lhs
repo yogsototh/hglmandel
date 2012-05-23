@@ -11,18 +11,31 @@ Most boilerplate was put in external files.
 
 > import YBoiler -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
-> 
-> -- yMainLoop takes two arguments
-> --   the title of the window
-> --   a function from time to triangles
+
+The `yMainLoop` takes two arguments:
+the title of the window 
+and a function from time to triangles
+
 > main :: IO ()
 > main = yMainLoop "3D Mandelbrot" (\_ -> allPoints)
-> 
+
+We set some global constant (this is generally bad).
+
 > nbDetails = 200 :: GLfloat
 > width  = nbDetails
 > height = nbDetails
 > deep   = nbDetails
-> 
+
+We then generate colored points from our function.
+This is similar to the preceding section.
+
+> allPoints :: [ColoredPoint]
+> allPoints = planPoints ++ map inverseDepth  planPoints
+>   where 
+>       planPoints = depthPoints ++ map inverseHeight depthPoints
+>       inverseHeight (x,y,z,c) = (x,-y,z,c)
+>       inverseDepth (x,y,z,c) = (x,y,-z+1/deep,c)
+
 > depthPoints :: [ColoredPoint]
 > depthPoints = do
 >   x <- [-width..width]
@@ -43,13 +56,6 @@ Most boilerplate was put in external files.
 >   -- Draw two triangles
 >   else [ps!!0,ps!!1,ps!!2,ps!!0,ps!!2,ps!!3]
 > 
-> allPoints :: [ColoredPoint]
-> allPoints = planPoints ++ map inverseDepth  planPoints
->   where 
->       planPoints = depthPoints ++ map inverseHeight depthPoints
->       inverseHeight (x,y,z,c) = (x,-y,z,c)
->       inverseDepth (x,y,z,c) = (x,y,-z+1/deep,c)
-> 
 > findMaxOrdFor func minval maxval 0 = (minval+maxval)/2
 > findMaxOrdFor func minval maxval n = 
 >   if (func medpoint) /= 0 
@@ -65,3 +71,14 @@ Most boilerplate was put in external files.
 >     ((t n),(t (n+5)),(t (n+10)))
 > 
 > ymandel x y z = mandel (2*x/width) (2*y/height) (2*z/deep) 64
+
+This code is cleaner but many things doesn't feel right.
+First, all the user interaction code is outside our main file.
+I feel it is okay to hide the detail for the rendering.
+But I would have preferred to control the user actions.
+
+On the other hand, we continue to handle a lot rendering details.
+For example, we provide ordered vertices.
+I feel, this should be externalized.
+
+I would have preferred to make things a bit more general.
