@@ -50,10 +50,12 @@ The mapping between user input and actions.
 >     ,(Press 's' , translate xdir (-0.1))
 >     ,(Press 'e' , translate ydir 0.1)
 >     ,(Press 'd' , translate ydir (-0.1))
+>     ,(Press 'z' , translate zdir 0.1)
+>     ,(Press 'r' , translate zdir (-0.1))
 >     ,(Press '+' , zoom 1.1)
 >     ,(Press '-' , zoom (1/1.1))
->     ,(Press 'r' , resize 1.2)
->     ,(Press 'z' , resize (1/1.2))
+>     ,(Press 'h' , resize 1.2)
+>     ,(Press 'g' , resize (1/1.2))
 >     ]
 
 The type of each couple should be of the form
@@ -67,7 +69,7 @@ And of course a type design the World State:
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
->     , shape       :: Function3D
+>     , shape       :: Scalar -> Function3D
 >     , box         :: Box3D
 >     } 
 
@@ -76,7 +78,10 @@ And of course a type design the World State:
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
->   objects w = [XYFunc (shape w) (box w)]
+>   objects w = [XYSymFunc ((shape  w) res) defbox]
+>               where
+>                   res = resolution $ box w
+>                   defbox = box w
 
 With all associated functions:
 
@@ -104,7 +109,7 @@ With all associated functions:
 > resize :: Scalar -> World -> World
 > resize r world = world {
 >     box = (box world) {
->      resolution = (resolution (box world)) * r }}
+>      resolution = sqrt ((resolution (box world))**2 * r) }}
 
 - [`YBoiler.hs`](code/04_Mandelbulb/YBoiler.hs), the 3D rendering
 - [`Mandel`](code/04_Mandelbulb/Mandel.hs), the mandel function
@@ -122,21 +127,22 @@ With all associated functions:
 > -- And the shape function
 > initialWorld :: World
 > initialWorld = World {
->    angle = makePoint3D (0,1,0)
+>    angle = makePoint3D (-30,0,0)
 >  , position = makePoint3D (0,0,0)
->  , scale = 0.2
+>  , scale = 0.8
 >  , shape = shapeFunc 
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
 >                , resolution =  0.2 }
 >  }
 > 
-> shapeFunc :: Function3D
-> shapeFunc x y = 
+> shapeFunc :: Scalar -> Function3D
+> shapeFunc res x y = 
 >   let 
 >       z = findMaxOrdFor (ymandel x y) 0 1 20
 >   in
->   if z < 0.000001
+>   if and [ findMaxOrdFor (ymandel (x+xeps) (y+yeps)) 0 1 20 < 0.000001 |
+>               val <- [res], xeps <- [-val,val], yeps<-[-val,val]]
 >       then Nothing 
 >       else Just z
 > 

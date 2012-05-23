@@ -211,13 +211,9 @@ yMainLoop winTitle
   displayCallback $= display worldRef
   -- Lights
   lighting $= Enabled
-  ambient (Light 0) $= Color4 0.7 0.6 0.3 1
-  diffuse (Light 0) $= Color4 1 1 1 1
-  position (Light 0) $= Vertex4 0.5 0.5 0.3 1
-  light (Light 0) $= Enabled
-  ambient (Light 1) $= Color4 0.7 0.6 0.3 1
-  diffuse (Light 1) $= Color4 1 1 1 1
-  position (Light 1) $= Vertex4 (-0.5) (-0.5) (-0.3) 1
+  ambient (Light 1) $= Color4 0.99 0.98 0.62 1
+  diffuse (Light 1) $= Color4 0.99 0.98 0.62 1
+  position (Light 1) $= Vertex4 0 0 1 0.1
   light (Light 1) $= Enabled
   -- We enter the main loop
   mainLoop
@@ -310,7 +306,6 @@ drawObject shape = do
         where 
             trinorm = (getNormal tri)
     drawTriangles _ = return ()
-    unityBox = makeBox (-2,-2,-2) (2,2,2) 0.05
 
 getNormal :: [Point3D] -> Point3D
 getNormal (p0:p1:p2:_) = (p1 - p0) * (p2 - p0)
