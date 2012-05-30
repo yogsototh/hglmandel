@@ -6,14 +6,17 @@ Steps:
 
 1. Mandelbrot set with Haskell OpenGL
 2. Mandelbrot edges
-3. 3D Mandelbrot (because 2D is for pussies)
+3. 3D Mandelbrot because its fun
 4. Clean the code from full impure and imperative to purer and purer.
+5. Refactor the code to separate nicely important parts
+6. Improve efficiency
 
 From 1 to 3 it will be _dirtier_ and _dirtier_.
 At 4, we will make some order in this mess!
 Hopefuly for the best!
 
-One of the goal of this article will be to show some good properties of Haskell and in particular how to make some real world application with it.
+One of the goal of this article is to show some good properties of Haskell.
+In particular, how to make some real world application with a pure functional language.
 
 I know drawing a simple mandelbrot set isn't a "real world" application. 
 But the idea is not to show you a real world application which would be hard to follows, but to give you a way to pass from the pure mindset to some real world application.
