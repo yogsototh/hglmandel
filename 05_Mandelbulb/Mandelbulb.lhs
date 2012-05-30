@@ -36,6 +36,7 @@ Here is a real working code, I've hidden most display functions.
 The YGL, is a kind of framework to display 3D functions.
 But it can easily be extended to many kind of representation.
 
+> import Debug.Trace (trace)
 > import YGL -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
 
@@ -193,7 +194,9 @@ Because we consider partial functions
 >   if and [ findMaxOrdFor (ymandel (x+xeps) (y+yeps)) 0 1 20 < 0.000001 |
 >               val <- [res], xeps <- [-val,val], yeps<-[-val,val]]
 >       then Nothing 
->       else Just (z,colorFromValue (ymandel x y z))
+>       else Just (z,colorFromValue ((ymandel x y z) * 64))
+
+With the color function.
 
 > colorFromValue n =
 >   let 
@@ -223,3 +226,4 @@ This file is commented a lot.
 - [`YGL.hs`](code/05_Mandelbulb/YGL.hs), the 3D rendering framework
 - [`Mandel`](code/05_Mandelbulb/Mandel.hs), the mandel function
 - [`ExtComplex`](code/05_Mandelbulb/ExtComplex.hs), the extended complexes
+

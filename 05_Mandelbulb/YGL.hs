@@ -324,7 +324,7 @@ drawObject shape = do
   -- We will print only Triangles
   renderPrimitive Triangles $ do
     -- solarized base3 color
-    color $ hexColor "#fdf603" 
+    -- color $ hexColor "#fdf603" 
     mapM_ drawAtom (atoms shape)
 
 -- simply draw an Atom
