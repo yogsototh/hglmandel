@@ -19,7 +19,7 @@ cat <<END
 isHidden:       false
 menupriority:   1
 kind:           article
-created_at:     2012-02-08T15:17:53+02:00
+created_at:     2012-04-30T19:17:53+02:00
 en: title: Haskell OpenGL Mandelbrot
 en: subtitle: A kind of real world example
 fr: title: Afficher mandelbrot en OpenGL avec Haskell
