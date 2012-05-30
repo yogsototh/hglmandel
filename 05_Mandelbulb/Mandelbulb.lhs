@@ -89,7 +89,7 @@ We simply have to provide the definition of some functions.
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
->   objects w = [XYSymFunc ((shape  w) res) defbox]
+>   objects w = [XYFunc ((shape  w) res) defbox]
 >               where
 >                   res = resolution $ box w
 >                   defbox = box w
@@ -193,7 +193,14 @@ Because we consider partial functions
 >   if and [ findMaxOrdFor (ymandel (x+xeps) (y+yeps)) 0 1 20 < 0.000001 |
 >               val <- [res], xeps <- [-val,val], yeps<-[-val,val]]
 >       then Nothing 
->       else Just z
+>       else Just (z,colorFromValue (ymandel x y z))
+
+> colorFromValue n =
+>   let 
+>       t :: Point -> Scalar
+>       t i = 0.7 + 0.3*cos( i / 10 )
+>   in
+>     makeColor (t n) (t (n+5)) (t (n+10))
 
 The rest is similar to the preceding sections.
 

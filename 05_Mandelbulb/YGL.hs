@@ -27,6 +27,8 @@ module YGL (
     , YObject (..)
     , Box3D (..)
     , makeBox
+    , hexColor
+    , makeColor
     -- Datas related to user Input
     , InputMap
     , UserInput (Press,Ctrl,Alt,CtrlAlt)
@@ -35,8 +37,8 @@ module YGL (
     , yMainLoop) where
 
 import Numeric (readHex)
-import Graphics.Rendering.OpenGL
-import Graphics.UI.GLUT
+import Graphics.Rendering.OpenGL hiding (Color)
+import Graphics.UI.GLUT hiding (Color)
 import Data.IORef
 import qualified Data.Map as Map
 import Control.Monad (when)
@@ -54,6 +56,7 @@ type Scalar  = GLfloat
 type Time = Int
 -- | A 3D Point mainly '(x,y,z)'
 data Point3D = P (Point,Point,Point) deriving (Eq,Show,Read)
+type Color = Color3 Scalar
 
 xpoint :: Point3D -> Point
 xpoint (P (x,_,_)) = x
@@ -105,17 +108,17 @@ makeBox mini maxi res = Box3D {
     , maxPoint = makePoint3D maxi
     , resolution = res  }
 
-type Function3D = Point -> Point -> Maybe Point
+type Triangle3D = (Point3D,Point3D,Point3D,Color)
+-- For a general purpose library we should add many other different atoms
+-- corresponding to Quads for example.
+data Atom = ColoredTriangle Triangle3D 
+type Function3D = Point -> Point -> Maybe (Point,Color)
 data YObject =   XYFunc Function3D Box3D
-               | XYSymFunc Function3D Box3D
-               | Tri [Point3D]
+               | Atoms [Atom]
 
-triangles :: YObject -> [Point3D]
-triangles (XYFunc f b) = getObject3DFromShapeFunction f b
-triangles (XYSymFunc f b) = tris ++ 
-    ( reverse $ map (\(P(x,y,z)) -> P (x,y,-z)) tris )
-    where tris = getObject3DFromShapeFunction f b
-triangles (Tri tri) = tri
+atoms :: YObject -> [Atom]
+atoms (XYFunc f b) = getObject3DFromShapeFunction f b
+atoms (Atoms atomList) = atomList
 
 -- | We decalre the input map type we need here
 -- | It is our API
@@ -150,18 +153,17 @@ defaultCamera = Camera {
 
 -- Given a shape function and a delimited Box3D
 -- return a list of Triangles to be displayed
-getObject3DFromShapeFunction :: Function3D -> Box3D -> [Point3D]
+getObject3DFromShapeFunction :: Function3D -> Box3D -> [Atom]
 getObject3DFromShapeFunction shape box = do
   x <- [xmin,xmin+res..xmax]
   y <- [ymin,ymin+res..ymax]
   let 
     neighbors = [(x,y),(x+res,y),(x+res,y+res),(x,y+res)]
-    -- zs are 3D points with found depth
+    -- zs are 3D points with found depth and color
+    -- zs :: [ (Point,Point,Point,Maybe (Point,Color) ]
     zs = map (\(u,v) -> (u,v,shape u v)) neighbors
     -- ps are 3D opengl points + color value
-    removeMaybe (u,v,Just w) = (u,v,w)
-    removeMaybe (_,_,Nothing) = (0,0,0)
-    ps = map removeMaybe zs
+    ps = zs
   -- If the point diverged too fast, don't display it
   if any (\(_,_,z) -> isNothing z) zs
   then []
@@ -170,8 +172,17 @@ getObject3DFromShapeFunction shape box = do
   --    | / |
   --    0 - 1
   -- The order is important
-  else map makePoint3D [ps!!0,ps!!2,ps!!1,ps!!0,ps!!3,ps!!2]
+  else 
+    [ makeAtom (ps!!0) (ps!!2) (ps!!1)
+    , makeAtom (ps!!0) (ps!!3) (ps!!2) ]
   where
+    makeAtom (p0x,p0y,Just (p0z,c0)) (p1x,p1y,Just (p1z,_)) (p2x,p2y,Just (p2z,_)) =
+        ColoredTriangle (makePoint3D (p0x,p0y,p0z)
+                        ,makePoint3D (p1x,p1y,p1z)
+                        ,makePoint3D (p2x,p2y,p2z)
+                        ,c0)
+    makeAtom _ _ _ = error "Somethings wrong here"
+
     -- some naming to make it 
     -- easier to read
     xmin = xpoint $ minPoint box
@@ -296,34 +307,35 @@ display worldRef = do
 scalarFromHex :: String -> Scalar
 scalarFromHex = (/256) . fst . head . readHex 
 
-hexColor :: [Char] -> Color3 Scalar
+hexColor :: [Char] -> Color
 hexColor ('#':rd:ru:gd:gu:bd:bu:[]) = Color3 (scalarFromHex (rd:ru:[]))
                                              (scalarFromHex (gd:gu:[])) 
                                              (scalarFromHex (bd:bu:[]))
 hexColor ('#':r:g:b:[]) = hexColor ('#':r:r:g:g:b:b:[])
 hexColor _ = error "Bad color!!!!"
+
+makeColor :: Scalar -> Scalar -> Scalar -> Color
+makeColor x y z = Color3 x y z
 ---
 
 -- drawObject :: (YObject obj) => obj -> IO()
 drawObject :: YObject -> IO()
 drawObject shape = do
-  -- We will print Points (not triangles for example) 
+  -- We will print only Triangles
   renderPrimitive Triangles $ do
     -- solarized base3 color
-    -- color $ Color3 (0.988::Point) (0.96::Point) (0.886::Point)
-    color $ hexColor "#fdf6e3" 
-    drawTriangles (triangles shape)
-  where
-    drawTriangles tri@(p0:p1:p2:points) = do
-        normal $ toGLNormal3 trinorm
-        vertex $ toGLVertex3 p0
-        vertex $ toGLVertex3 p1
-        vertex $ toGLVertex3 p2
-        drawTriangles points
-        where 
-            trinorm = (getNormal tri)
-    drawTriangles _ = return ()
+    color $ hexColor "#fdf603" 
+    mapM_ drawAtom (atoms shape)
 
-getNormal :: [Point3D] -> Point3D
-getNormal (p0:p1:p2:_) = (p1 - p0) * (p2 - p0)
-getNormal _ = makePoint3D (0,0,1)
+-- simply draw an Atom
+drawAtom :: Atom -> IO ()
+drawAtom atom@(ColoredTriangle (p0,p1,p2,c)) = do
+    color c
+    normal $ toGLNormal3 (getNormal atom)
+    vertex $ toGLVertex3 p0
+    vertex $ toGLVertex3 p1
+    vertex $ toGLVertex3 p2
+
+-- get the normal vector of an Atom
+getNormal :: Atom -> Point3D
+getNormal (ColoredTriangle (p0,p1,p2,_)) = (p1 - p0) * (p2 - p0)
