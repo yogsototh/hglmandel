@@ -15,6 +15,7 @@ module YGL (
     Point 
     , Time
     , Scalar
+    , Color
     , Point3D
     , makePoint3D -- helper (x,y,z) -> Point3D
     , (-*<) -- scalar product on Point3D

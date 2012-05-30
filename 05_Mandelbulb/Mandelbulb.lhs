@@ -36,7 +36,6 @@ Here is a real working code, I've hidden most display functions.
 The YGL, is a kind of framework to display 3D functions.
 But it can easily be extended to many kind of representation.
 
-> import Debug.Trace (trace)
 > import YGL -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
 
@@ -198,6 +197,7 @@ Because we consider partial functions
 
 With the color function.
 
+> colorFromValue :: Point -> Color
 > colorFromValue n =
 >   let 
 >       t :: Point -> Scalar
