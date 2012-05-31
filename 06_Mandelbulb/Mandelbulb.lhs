@@ -83,16 +83,17 @@
 > -- And the shape function
 > initialWorld :: World
 > initialWorld = World {
->    angle = makePoint3D (-30,-30,0)
+>    angle = makePoint3D (30,30,0)
 >  , position = makePoint3D (0,0,0)
->  , scale = 0.8
+>  , scale = 1.0
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
->                , resolution =  0.16 }
+>                , resolution =  0.02 }
 >  , told = 0
 >  , cache = objectFunctionFromWorld initialWorld
 >  }
 > 
+> objectFunctionFromWorld :: World -> [YObject]
 > objectFunctionFromWorld w = [Atoms atomList]
 >   where atomListPositive = 
 >           getObject3DFromShapeFunction (shapeFunc (resolution (box w))) (box w)
