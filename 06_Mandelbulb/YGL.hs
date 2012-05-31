@@ -16,7 +16,7 @@ module YGL (
     , Time
     , Scalar
     , Color
-    , Point3D
+    , Point3D (..)
     , makePoint3D -- helper (x,y,z) -> Point3D
     , (-*<) -- scalar product on Point3D
     , Function3D
@@ -30,6 +30,7 @@ module YGL (
     , YObject (..)
     , Box3D (..)
     , makeBox
+    , getObject3DFromShapeFunction
     , hexColor
     , makeColor
     -- Datas related to user Input

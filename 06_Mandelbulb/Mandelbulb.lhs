@@ -3,8 +3,6 @@
 
 > import YGL -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
-> import Data.Maybe (isNothing)
-
 
 > -- Centralize all user input interaction
 > inputActionMap :: InputMap World
@@ -33,10 +31,8 @@
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
->     , shape       :: Scalar -> Function3D
 >     , box         :: Box3D
 >     , told        :: Time -- last frame time
->     , toCompute   :: Bool
 >     , cache       :: [YObject]
 >     } 
 
@@ -47,7 +43,7 @@
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
->   objects w = cache w
+>   objects = cache
 
 <div style="display:hidden">
 
@@ -90,55 +86,22 @@
 >    angle = makePoint3D (-30,-30,0)
 >  , position = makePoint3D (0,0,0)
 >  , scale = 0.8
->  , shape = shapeFunc 
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
 >                , resolution =  0.16 }
 >  , told = 0
 >  , cache = objectFunctionFromWorld initialWorld
->  , toCompute = True
 >  }
 > 
-> objectFunctionFromWorld w = [Atoms $ 
->       getObject3DFromShapeFunction (shapeFunc (resolution (box w))) (box w)]
+> objectFunctionFromWorld w = [Atoms atomList]
+>   where atomListPositive = 
+>           getObject3DFromShapeFunction (shapeFunc (resolution (box w))) (box w)
+>         atomList = atomListPositive ++ 
+>           map negativeTriangle atomListPositive
+>         negativeTriangle (ColoredTriangle (p1,p2,p3,c)) = 
+>               ColoredTriangle (negz p1,negz p2,negz p3,c)
+>               where negz (P (x,y,z)) = P (x,y,-z)
 >
-> getObject3DFromShapeFunction :: Function3D -> Box3D -> [Atom]
-> getObject3DFromShapeFunction shape box = do
->   x <- [xmin,xmin+res..xmax]
->   y <- [ymin,ymin+res..ymax]
->   let 
->     neighbors = [(x,y),(x+res,y),(x+res,y+res),(x,y+res)]
->     -- zs are 3D points with found depth and color
->     -- zs :: [ (Point,Point,Point,Maybe (Point,Color) ]
->     zs = map (\(u,v) -> (u,v,shape u v)) neighbors
->     -- ps are 3D opengl points + color value
->     ps = zs
->   -- If the point diverged too fast, don't display it
->   if any (\(_,_,z) -> isNothing z) zs
->   then []
->   -- Draw two triangles
->   --    3 - 2
->   --    | / |
->   --    0 - 1
->   -- The order is important
->   else 
->     [ makeAtom (ps!!0) (ps!!2) (ps!!1)
->     , makeAtom (ps!!0) (ps!!3) (ps!!2) ]
->   where
->     makeAtom (p0x,p0y,Just (p0z,c0)) (p1x,p1y,Just (p1z,_)) (p2x,p2y,Just (p2z,_)) =
->         ColoredTriangle (makePoint3D (p0x,p0y,p0z)
->                         ,makePoint3D (p1x,p1y,p1z)
->                         ,makePoint3D (p2x,p2y,p2z)
->                         ,c0)
->     makeAtom _ _ _ = error "Somethings wrong here"
->     -- some naming to make it 
->     -- easier to read
->     xmin = xpoint $ minPoint box
->     xmax = xpoint $ maxPoint box
->     ymin = ypoint $ minPoint box
->     ymax = ypoint $ maxPoint box
->     res = resolution box
-> 
 > idleAction :: Time -> World -> World
 > idleAction tnew world = 
 >       world {
