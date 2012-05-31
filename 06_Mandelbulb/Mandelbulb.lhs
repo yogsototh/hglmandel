@@ -1,9 +1,33 @@
  ## Optimization
 
+All feel good from the architecture point of vue.
+More precisely, the separation between rendering and world behavior is clear.
+But this is extremely slow now.
+Because we compute the mandelbulb for each frame now.
+
+Before we had
+
+   Constant Function -> Constant List of Triangles -> Display
+
+Now we have 
+
+    World -> Function -> List of Objects -> Atoms -> Display
+
+And the World state could change. 
+Then it is no more straightforward for the compiler to understand
+when not to recompute the entire list of atoms.
+
+Then to optimize we will have to make things a little less separate.
+We must control the flow of atom generation.
+
+Mostly the program is the same as before, but instead of providing a 
+function, we will provide the list of atoms directly.
+
+<div style="display:none">
 
 > import YGL -- Most the OpenGL Boilerplate
 > import Mandel -- The 3D Mandelbrot maths
-
+> 
 > -- Centralize all user input interaction
 > inputActionMap :: InputMap World
 > inputActionMap = inputMapFromList [
@@ -25,14 +49,15 @@
 >     ,(Press 'g' , resize (1/1.2))
 >     ]
 
+</div>
 
-> -- I prefer to set my own name for these types
 > data World = World {
 >       angle       :: Point3D
 >     , scale       :: Scalar
 >     , position    :: Point3D
 >     , box         :: Box3D
->     , told        :: Time -- last frame time
+>     , told        :: Time 
+>     -- We replace shape by cache
 >     , cache       :: [YObject]
 >     } 
 
@@ -43,9 +68,10 @@
 >         camPos = position w, 
 >         camDir = angle w,
 >         camZoom = scale w }
+>   -- We update our objects instanciation
 >   objects = cache
 
-<div style="display:hidden">
+<div style="display:none">
 
 > xdir :: Point3D
 > xdir = makePoint3D (1,0,0)
@@ -67,16 +93,14 @@
 > zoom :: Scalar -> World -> World
 > zoom z world = world {
 >     scale = z * scale world }
-> 
-> resize :: Scalar -> World -> World
-> resize r world = 
->   tmpWorld { cache = objectFunctionFromWorld tmpWorld }
->   where 
->       tmpWorld = world { box = (box world) {
->               resolution = sqrt ((resolution (box world))**2 * r) }}
-> 
+
 > main :: IO ()
 > main = yMainLoop inputActionMap idleAction initialWorld
+
+</div>
+
+Our initial world state is slightly changed:
+
 
 > -- We initialize the world state
 > -- then angle, position and zoom of the camera
@@ -90,9 +114,13 @@
 >                , maxPoint =  makePoint3D (2,2,2)
 >                , resolution =  0.02 }
 >  , told = 0
+>  -- We declare cache directly this time
 >  , cache = objectFunctionFromWorld initialWorld
 >  }
-> 
+
+We use the `YGL.getObject3DFromShapeFunction` function directly.
+This way instead of providing `XYFunc`, we provide directly a list of Atoms.
+
 > objectFunctionFromWorld :: World -> [YObject]
 > objectFunctionFromWorld w = [Atoms atomList]
 >   where atomListPositive = 
@@ -102,7 +130,22 @@
 >         negativeTriangle (ColoredTriangle (p1,p2,p3,c)) = 
 >               ColoredTriangle (negz p1,negz p2,negz p3,c)
 >               where negz (P (x,y,z)) = P (x,y,-z)
->
+
+We know that resize is the only world change that necessitate to 
+recompute the list of atoms (triangles). 
+Then we update our world state accordingly.
+
+> resize :: Scalar -> World -> World
+> resize r world = 
+>   tmpWorld { cache = objectFunctionFromWorld tmpWorld }
+>   where 
+>       tmpWorld = world { box = (box world) {
+>               resolution = sqrt ((resolution (box world))**2 * r) }}
+
+All the rest is exactly the same.
+
+<div style="display:none">
+
 > idleAction :: Time -> World -> World
 > idleAction tnew world = 
 >       world {
