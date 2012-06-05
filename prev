@@ -2,12 +2,22 @@
 
 webroot="$HOME/Sites/webroot"
 
+print -- "Search script"
+while [[ ! -x ./create_ymd.sh ]]; do 
+    [[ $PWD = "/" ]] && {
+        print -- "Error: can't find create_ymd.sh" >&2
+        exit 1
+    }
+    cd ..
+done
+
 print -- "Create article"
 ./create_ymd.sh > $webroot/latest.ymd
 
-print -- "Copy sources"
+print -- "Copy source codes"
+latestArticleDir=$(ls -l $webroot/latest.ymd | perl -pi -e 's#.*/##; s#.md$##')
 for langue in en fr; do
-    dst="$webroot/output/Scratch/$langue/blog/Haskell-OpenGL-Mandelbrot/code"
+    dst="$webroot/output/Scratch/$langue/blog/$latestArticleDir/code"
     [[ ! -d $dst ]] && mkdir -p $dst
     cp -r *.lhs ??_*(N/)  $dst
 done

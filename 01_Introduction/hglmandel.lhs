@@ -1,15 +1,19 @@
  ## First version
 
 We can consider two parts.
-The first being mostly some boilerplate.
-Generally in Haskell you need to declare a lot of import lines.
-This is something I find annoying.
-In particular, it should be possible to create a special file, Import.hs
-which make all the necessary import for you, as you generally need them all.
-I understand why this is cleaner to force the programmer not to do so, but, each time I do a copy/paste, I feel something is wrong.
+The first being mostly some boilerplate[^1].
 The second part, contain more interesting stuff.
 Even in this part, there are some necessary boilerplate. 
 But it is due to the OpenGL library this time.
+
+
+[^1]: Generally in Haskell you need to declare a lot of import lines.
+      This is something I find annoying.
+      In particular, it should be possible to create a special file, Import.hs
+      which make all the necessary import for you, as you generally need them all.
+      I understand why this is cleaner to force the programmer not to do so,
+      but, each time I do a copy/paste, I feel something is wrong.
+      I believe this concern can be generalized to the lack of namespace in Haskell.
 
  ### Let's play the song of our people
 
@@ -140,10 +144,10 @@ Given two coordinates in pixels, it returns some integer value:
 >   in
 >       f (complex r i) 0 64
 
-It uses the main mandelbrot function for each complex $c$.
+It uses the main mandelbrot function for each complex \\(c\\).
 The mandelbrot set is the set of complex number c such that the following sequence does not escape to infinity.
 
-Let us define $f_c: \mathbb{C} \to \mathbb{C}$
+Let us define \\(f_c: \mathbb{C} \to \mathbb{C}\\)
 
 $$ f_c(z) = z^2 + c $$
 

@@ -2,6 +2,10 @@
 
 TODO: write something nice after reading.
 
+The B in Benoît B. Mandelbrot stand fro Benoît B. Mandelbrot
+
+[^1]: [Source on reddit](http://www.reddit.com/r/math/comments/uirv8/are_math_jokes_okay_here_i_just_came_up_with_one/c4vr2zo)
+
 Steps: 
 
 1. Mandelbrot set with Haskell OpenGL

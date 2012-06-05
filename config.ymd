@@ -1,0 +1,25 @@
+-----
+isHidden:       false
+menupriority:   1
+kind:           article
+created_at:     2012-04-30T19:17:53+02:00
+en: title: Haskell Working Program
+en: subtitle: An OpenGL 3D extension of the Mandelbrot set
+fr: title: Un programme Haskell fonctionnel
+fr: subtitle: Une extension de l'ensemble de Mandelbrot en 3D et en OpenGL
+author_name: Yann Esposito
+author_uri: yannesposito.com
+tags:
+  - Haskell
+  - programming
+  - functional
+  - tutorial
+-----
+blogimage("HGL_Plan.png","The plan in image")
+
+begindiv(intro)
+
+en: %tldr A progressive real world example.
+fr: %tlal Un exemple progressif de programmation avec Haskell.
+
+
