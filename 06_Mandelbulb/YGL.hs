@@ -230,26 +230,24 @@ yMainLoop inputActionMap
           Just (keyboardMouse inputActionMap worldRef)
   -- We generate one frame using the callback
   displayCallback $= display worldRef
+  normalize $= Enabled -- let OpenGL resize normal vectors to unity
+  shadeModel $= Smooth
   -- Lights
   lighting $= Enabled
-  ambient (Light 0) $= Color4 0 0 0 1
+  ambient (Light 0) $= Color4 0.5 0.5 0.5 1
   diffuse (Light 0) $= Color4 1 1 1 1
-  specular (Light 0) $= Color4 1 1 1 1
-  position (Light 0) $= Vertex4 1 1 0 1
+  -- specular (Light 0) $= Color4 1 1 1 1
+  -- position (Light 0) $= Vertex4 (-5) 5 10 0
   light (Light 0) $= Enabled
-  ambient (Light 1) $= Color4 0 0 0 1
-  diffuse (Light 1) $= Color4 1 0.9 0.0 1
-  specular (Light 1) $= Color4 1 1 1 1
-  position (Light 1) $= Vertex4 0 0 1 1
-  light (Light 1) $= Enabled
+  pointSmooth $= Enabled
+  
   colorMaterial $= Just (Front,AmbientAndDiffuse)
-  -- materialDiffuse Front $= Color4 0.5 0.5 0.5 1 
-  materialDiffuse Front $= Color4 0.5 0.5 0.5 1 
-  materialAmbient Front $= Color4 0.5 0.5 0.5 1 
-  materialSpecular Front $= Color4 0.2 0.2 0.2 1 
-  materialEmission Front $= Color4 0.3 0.3 0.3 1
-  materialShininess Front $= 1.0
+  materialAmbient Front $= Color4 0.0 0.0 0.0 1 
+  materialDiffuse Front $= Color4 0.0 0.0 0.0 1 
+  materialSpecular Front $= Color4 1 1 1 1
+  materialEmission Front $= Color4 0.0 0.0 0.0 1
   -- We enter the main loop
+  materialShininess Front $= 96
   mainLoop
 
 -- When no user input entered do nothing
