@@ -15,11 +15,11 @@ tags:
   - functional
   - tutorial
 -----
-blogimage("HGL_Plan.png","The plan in image")
+blogimage("BenoitBMandelbrot.jpg","The B in Benoît B. Mandelbrot stand for Benoît B. Mandelbrot")
 
 begindiv(intro)
 
-en: %tldr A progressive real world example.
-fr: %tlal Un exemple progressif de programmation avec Haskell.
+en: %tldr You will see how to go from theory to a real application using Haskell.
+fr: %tlal Un exemple progressif d'utilisation d'Haskell.
 
 
