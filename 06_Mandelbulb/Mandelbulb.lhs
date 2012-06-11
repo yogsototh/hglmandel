@@ -3,7 +3,7 @@
 All feel good from the architecture point of vue.
 More precisely, the separation between rendering and world behavior is clear.
 But this is extremely slow now.
-Because we compute the mandelbulb for each frame now.
+Because we compute the Mandelbulb for each frame now.
 
 Before we had
 
@@ -120,7 +120,7 @@ Our initial world state is slightly changed:
 >  , scale = 1.0
 >  , box = Box3D { minPoint = makePoint3D (-2,-2,-2)
 >                , maxPoint =  makePoint3D (2,2,2)
->                , resolution =  0.01 }
+>                , resolution =  0.03 }
 >  , told = 0
 >  -- We declare cache directly this time
 >  , cache = objectFunctionFromWorld initialWorld
@@ -132,7 +132,8 @@ This way instead of providing `XYFunc`, we provide directly a list of Atoms.
 > objectFunctionFromWorld :: World -> [YObject]
 > objectFunctionFromWorld w = [Atoms atomList]
 >   where atomListPositive = 
->           getObject3DFromShapeFunction (shapeFunc (resolution (box w))) (box w)
+>           getObject3DFromShapeFunction
+>               (shapeFunc (resolution (box w))) (box w)
 >         atomList = atomListPositive ++ 
 >           map negativeTriangle atomListPositive
 >         negativeTriangle (ColoredTriangle (p1,p2,p3,c)) = 

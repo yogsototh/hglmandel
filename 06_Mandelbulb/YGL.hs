@@ -70,8 +70,7 @@ zpoint :: Point3D -> Point
 zpoint (P (_,_,z)) = z
 
 makePoint3D :: (Point,Point,Point) -> Point3D
-makePoint3D p = P p
-
+makePoint3D = P
 
 instance Num Point3D where
     (+) (P (ax,ay,az)) (P (bx,by,bz)) = P (ax+bx,ay+by,az+bz)
@@ -315,25 +314,21 @@ display worldRef = do
 scalarFromHex :: String -> Scalar
 scalarFromHex = (/256) . fst . head . readHex 
 
-hexColor :: [Char] -> Color
-hexColor ('#':rd:ru:gd:gu:bd:bu:[]) = Color3 (scalarFromHex (rd:ru:[]))
-                                             (scalarFromHex (gd:gu:[])) 
-                                             (scalarFromHex (bd:bu:[]))
-hexColor ('#':r:g:b:[]) = hexColor ('#':r:r:g:g:b:b:[])
+hexColor :: String -> Color
+hexColor ('#':rd:ru:gd:gu:bd:bu:[]) = Color3 (scalarFromHex [rd,ru])
+                                             (scalarFromHex [gd,gu]) 
+                                             (scalarFromHex [bd,bu])
+hexColor ('#':r:g:b:[]) = hexColor ['#',r,r,g,g,b,b]
 hexColor _ = error "Bad color!!!!"
 
 makeColor :: Scalar -> Scalar -> Scalar -> Color
-makeColor x y z = Color3 x y z
+makeColor = Color3
 ---
 
 -- drawObject :: (YObject obj) => obj -> IO()
 drawObject :: YObject -> IO()
-drawObject shape = do
-  -- We will print only Triangles
-  renderPrimitive Triangles $ do
-    -- solarized base3 color
-    -- color $ hexColor "#fdf603" 
-    mapM_ drawAtom (atoms shape)
+drawObject shape = renderPrimitive Triangles $
+                        mapM_ drawAtom (atoms shape)
 
 -- simply draw an Atom
 drawAtom :: Atom -> IO ()
