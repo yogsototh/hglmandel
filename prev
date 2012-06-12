@@ -15,11 +15,19 @@ print -- "Create article"
 ./create_ymd.sh > $webroot/latest.ymd
 
 print -- "Copy source codes"
+ycp() {
+    print -- $*
+    cp $*
+}
 latestArticleDir=$(ls -l $webroot/latest.ymd | perl -pi -e 's#.*/##; s#.md$##')
 for langue in en fr; do
     dst="$webroot/output/Scratch/$langue/blog/$latestArticleDir/code"
     [[ ! -d $dst ]] && mkdir -p $dst
-    cp -r *.lhs ??_*(N/)  $dst
+    ycp *.lhs(N) $dst
+    for dir in ??_*(N/); do
+        mkdir $dst/$dir
+        ycp $dir/*.{lhs,hs} $dst/$dir
+    done
 done
 
 cd $webroot
