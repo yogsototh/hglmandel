@@ -16,7 +16,11 @@ print -- "Create article"
 
 print -- "Copy source codes"
 ycp() {
-    print -- $*
+    local precedent=""
+    for e in $*;do
+        [[ $precedent != "" ]] && print -- "\t$precedent"
+        precedent=$e
+    done
     cp $*
 }
 latestArticleDir=$(ls -l $webroot/latest.ymd | perl -pi -e 's#.*/##; s#.md$##')
@@ -25,10 +29,10 @@ for langue in en fr; do
     [[ ! -d $dst ]] && mkdir -p $dst
     ycp *.lhs(N) $dst
     for dir in ??_*(N/); do
-        mkdir $dst/$dir
-        ycp $dir/*.{lhs,hs} $dst/$dir
+        [[ ! -d $dst/$dir ]] && mkdir $dst/$dir
+        ycp $dir/*.{lhs,hs}(.N) $dst/$dir
     done
 done
-
+print -- "\nRecompile"
 cd $webroot
 ./tasks/recompile
