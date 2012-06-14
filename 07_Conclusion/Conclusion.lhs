@@ -22,4 +22,4 @@ Such an optimization would have been harder by using directly the OpenGL library
 
 You should also want to make a more precise object. Because, the Mandelbulb is
 clearly not convex. But a precise rendering might be very long from 
-\\(O(n^2log n)\\) to \\(O(n^3)\\).
+O(n².log(n)) to O(n³).

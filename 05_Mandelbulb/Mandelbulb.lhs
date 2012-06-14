@@ -6,8 +6,11 @@ Some points:
    In particular the `mainLoop` function is a direct link to the C library (FFI).
    This function is clearly far from the functional paradigm.
    Could we make this better?
-   We will have two choices, or create our own `mainLoop` function to make it more functional.
-   Or deal with the imperative nature of the GLUT `mainLoop` function.
+   We will have two choices: 
+
+   - create our own `mainLoop` function to make it more functional.
+   - deal with the imperative nature of the GLUT `mainLoop` function.
+
    As one of the goal of this article is to understand how to deal with existing libraries and particularly the one coming from imperative languages, we will continue to use the `mainLoop` function.
 2. Our main problem come from user interaction.
    If you ask "the Internet", 
@@ -237,9 +240,9 @@ The rest is similar to the preceding sections.
 > ymandel :: Point -> Point -> Point -> Point
 > ymandel x y z = fromIntegral (mandel x y z 64) / 64
 
-I won't put how the magic occurs directly here.
-But all the magic occurs in the file `YGL.hs`.
-This file is commented a lot.
+I won't explain how the magic occurs here.
+If you are interested, just read the file [`YGL.hs`](code/05_Mandelbulb/YGL.hs).
+It is commented a lot.
 
 - [`YGL.hs`](code/05_Mandelbulb/YGL.hs), the 3D rendering framework
 - [`Mandel`](code/05_Mandelbulb/Mandel.hs), the mandel function
