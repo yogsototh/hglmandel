@@ -47,5 +47,5 @@ And here are the intermediate steps:
 
 blogimage("HGL_Plan.png","The parts of the article")
 
-From 1 to 3 it will be _dirtier_ and _dirtier_.
-We start cleaning everything at the 4th part.
+From the 2nd section to the 4th it will be _dirtier_ and _dirtier_.
+We start cleaning everything at the 5th section.
