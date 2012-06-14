@@ -39,7 +39,9 @@ and something nice to see in 3D.
 
 Here is what you'll end with:
 
-blogimage("GoldenMandelbulb.png","A golden mandelbulb")
+blogfigure("GoldenMandelbulb.png","The entire Mandelbulb")
+blogfigure("3DMandelbulbDetail.png","A Mandelbulb detail")
+blogfigure("3DMandelbulbDetail2.png","Another detail of the Mandelbulb")
 
 And here are the intermediate steps:
 
