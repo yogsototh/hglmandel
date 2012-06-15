@@ -23,9 +23,9 @@ begindiv(intro)
 en: %tldr A progressive Haskell example. 
 en: A Mandelbrot set extended in 3D, rendered using OpenGL and coded with Haskell.
 en: In the end the code will be very clean.
-en: The meaningful stuff will be in a pure functional bubble. 
+en: The significant stuff will be in a pure functional bubble. 
 en: The display details will be put in an external module playing the role of a wrapper.
-en: You'll can use this kind of functional organization even in imperative language.
+en: Imperative language could also benefit from this functional organization.
 fr: %tlal Un exemple progressif d'utilisation d'Haskell.
 fr: Vous pourrez voir un ensemble de Mandelbrot étendu à la troisième dimension.
 fr: De plus le code sera très propre.
