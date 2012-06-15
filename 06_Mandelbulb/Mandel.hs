@@ -3,6 +3,7 @@ module Mandel (mandel) where
 
 import ExtComplex
 
+mandel :: GLfloat -> GLfloat -> GLfloat -> Int -> Int
 mandel r i s nbIterations = 
     f (extcomplex r i s) 0 nbIterations
     where
