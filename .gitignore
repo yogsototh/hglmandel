@@ -1,5 +1,9 @@
 *.o
 *.hi
 *~
+*.swp
 Mandelbulb
 hglmandel
+.stack-work/
+dist/
+.hdevtools.sock
